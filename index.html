@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LANE SEQ</title>
+<title>ORBITANT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap" rel="stylesheet">
@@ -17,22 +17,9 @@
   --amber:#f5b301;
   --white:#e4e4e4;
   --dim:#6e6e6e;
-  /* 手機直式 */
-  --cw:17px;
-  --gut:40px;
-  --tail:22px;
-  --strip:272px;
-  --row:334px;
-  --pad:5px;
-  --fs:10px;
-  --fcell:10px;
-  --bh:16px;
-}
-@media (min-width:560px){
-  :root{
-    --cw:24px; --gut:52px; --tail:24px; --strip:384px; --row:460px;
-    --pad:8px; --fs:12px; --fcell:11px; --bh:18px;
-  }
+  /* 以下九項由 fit() 依視窗寬度算出，比例固定 */
+  --cw:19px; --gut:41px; --tail:19px; --strip:304px; --row:364px;
+  --pad:6px; --fs:10px; --fcell:9px; --bh:15px; --dice:14px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -42,22 +29,16 @@ body{
   padding:14px 8px 24px;
   -webkit-text-size-adjust:100%;
 }
-@media (min-width:560px){ body{padding:22px 20px 30px} }
 .rack{width:calc(var(--row) + var(--pad)*2);margin:0 auto}
 
-.head{margin-bottom:10px;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.head{margin-bottom:calc(var(--pad)*1.6);display:flex;align-items:baseline}
 .head .big{font-size:22px;line-height:22px;letter-spacing:.14em;color:var(--amber);font-weight:700}
 .head .note{color:var(--dim);letter-spacing:.14em}
-@media (min-width:560px){
-  .head{margin-bottom:14px;gap:12px}
-  .head .big{font-size:32px;line-height:32px}
-}
 
 .mod{background:var(--panel);padding:var(--pad);margin-bottom:6px}
 .hd{display:grid;grid-template-columns:var(--gut) 1fr;align-items:center;margin-bottom:5px}
 .hd .cap{letter-spacing:.14em;color:var(--dim)}
-.ctl{display:flex;align-items:center;gap:5px;flex-wrap:wrap;row-gap:4px}
-@media (min-width:560px){ .ctl{gap:8px} }
+.ctl{display:flex;align-items:center;gap:calc(var(--pad)*0.9);flex-wrap:wrap;row-gap:4px}
 .fld{display:flex;align-items:center;gap:1px;flex:none}
 .fld label{color:var(--dim);margin-right:2px;letter-spacing:.1em}
 button{font:inherit;font-weight:600;color:var(--white);background:var(--cell);
@@ -66,15 +47,16 @@ button{font:inherit;font-weight:600;color:var(--white);background:var(--cell);
 button:hover{background:#3d3d3d;color:var(--amber)}
 button:active{background:var(--amber);color:#140d00;border-color:var(--amber)}
 button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
-.stp{width:15px;padding:0;text-align:center}
-.n{min-width:22px;text-align:center;display:inline-block;color:var(--amber);
+.stp{width:calc(var(--bh) - 1px);padding:0;text-align:center}
+.n{min-width:calc(var(--cw)*1.2);text-align:center;display:inline-block;color:var(--amber);
    font-family:'Manolo Mono',monospace;font-weight:400}
 .n.warn{color:#ff5a34}
-.play{width:38px;letter-spacing:.1em;padding:0}
+.play{width:calc(var(--cw)*2.1);letter-spacing:.1em;padding:0}
 .play.on{background:var(--amber);border-color:var(--amber);color:#140d00}
-.pick{min-width:26px;text-align:center;color:var(--amber);padding:0 3px}
+.pick{min-width:calc(var(--cw)*1.5);text-align:center;color:var(--amber);
+      padding:0 3px;cursor:ns-resize;touch-action:none}
 .tabs{display:flex;flex:none}
-.tabs button{width:18px;padding:0;border-right:none}
+.tabs button{width:calc(var(--cw)*0.95);padding:0;border-right:none}
 .tabs button:last-child{border-right:1px solid #3d3d3d}
 .tabs button.sel{background:var(--amber);color:#140d00;border-color:var(--amber)}
 .mute.on{background:var(--amber);color:#140d00;border-color:var(--amber)}
@@ -96,12 +78,13 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 .cell.now{outline:1px solid #fff;outline-offset:-1px}
 .cell.now:not(.hit){color:#fff}
 .ruler{display:grid;grid-template-columns:repeat(16,var(--cw));margin-bottom:2px}
-.ruler span{display:flex;align-items:center;justify-content:center;height:7px}
+.ruler span{display:flex;align-items:center;justify-content:center;
+            height:calc(var(--cw)*0.4)}
 .ruler svg{display:block;fill:#fff;shape-rendering:crispEdges}
 
-.dice{width:16px;height:16px;padding:0;border:none;background:none;
+.dice{width:var(--dice);height:var(--dice);padding:0;border:none;background:none;
       color:var(--dim);line-height:0;cursor:pointer;justify-self:end}
-.dice svg{width:16px;height:16px;display:block}
+.dice svg{width:var(--dice);height:var(--dice);display:block}
 .dice:hover{color:var(--amber);background:none}
 .dice:active{color:#fff;background:none}
 .dice:focus-visible{outline:1px solid var(--amber);outline-offset:2px}
@@ -120,8 +103,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 
 <div class="rack">
 <div class="head">
-  <div class="big">LANE SEQ</div>
-  <div class="note">4 TRK / 2-OP FM</div>
+  <div class="big">ORBITANT</div>
 </div>
 
 <div class="mod">
@@ -172,11 +154,10 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 "use strict";
 
 const N=16, REROLL_P=1/7;
-/* M RAT：tracker 式兩位數，前位是分子後位是分母，各 1-8。11=1/1、32=3/2、14=1/4 */
-function ratNum(v){ return (v>>3)+1; }
-function ratDen(v){ return (v&7)+1; }
-function ratOf(v){ return ratNum(v)/ratDen(v); }
-function ratLbl(v){ return String(ratNum(v))+String(ratDen(v)); }
+/* M RAT：兩位數 = 比值 ×10，05-80 → 0.5-8.0。10=1.0、15=1.5、80=8.0 */
+function ratOf(v){ return v/10; }
+function ratLbl(v){ return v<10 ? "0"+v : String(v); }
+
 const NOTE=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const SCALES=[
   {n:"MAJ", s:[0,2,4,5,7,9,11]},
@@ -198,7 +179,7 @@ const SPEC=[
   {id:"dec",   label:"DEC",   min:0,  max:99, def:45, len:2},
   {id:"end",   label:"END",   min:0,  max:99, def:0,  len:1},
   {id:"midx",  label:"M IDX", min:0,  max:99, def:40, len:5},
-  {id:"mrat",  label:"M RAT", min:0,  max:63, def:8,  len:1, ratio:true},
+  {id:"mrat",  label:"M RAT", min:5,  max:80, def:20, len:1, ratio:true, nsp:3},
   {id:"matk",  label:"M ATK", min:0,  max:99, def:0,  len:1},
   {id:"mdec",  label:"M DEC", min:0,  max:99, def:35, len:1},
   {id:"mend",  label:"M END", min:0,  max:99, def:10, len:1}
@@ -211,7 +192,7 @@ function nextReroll(){ return Math.random()<REROLL_P; }
 
 function makeTrack(i){
   const e=[[16,4,0],[16,5,2],[12,3,0],[7,3,1]][i];
-  const t={mute:false,oct:0,steps:e[0],pulses:e[1],rot:e[2],reroll:nextReroll(),lanes:{}};
+  const t={mute:false,oct:[3,4,2,4][i],steps:e[0],pulses:e[1],rot:e[2],reroll:nextReroll(),lanes:{}};
   SPEC.forEach(function(s){
     t.lanes[s.id]={len:s.len,idx:0,vals:new Array(N).fill(s.def),reroll:nextReroll()};
   });
@@ -220,7 +201,7 @@ function makeTrack(i){
   t.lanes.pitch.len=ps[i].length;
   t.lanes.lvl.len=[3,4,5,3][i];
   t.lanes.pan.vals.fill([0,2,1,2][i]);
-  t.lanes.mrat.vals.fill([8,17,0,35][i]);   // 2/1, 3/2, 1/1, 5/4
+  t.lanes.mrat.vals.fill([20,15,10,40][i]);   // 2.0, 1.5, 1.0, 4.0
   [20,60,35,80,45].forEach(function(v,k){ t.lanes.midx.vals[k]=v; });
   [30,55].forEach(function(v,k){ t.lanes.dec.vals[k]=v; });
   return t;
@@ -257,7 +238,8 @@ function tA(v){ return 0.0006*Math.pow(900,v/99); }
 function tD(v){ return 0.004*Math.pow(500,v/99); }
 
 function note(t0,p,gate,oct){
-  const fc=220*Math.pow(2,(degToSemi(p.pitch)+12*oct)/12), fm=fc*ratOf(p.mrat);
+  const midi=12*(oct+1)+degToSemi(p.pitch);
+  const fc=440*Math.pow(2,(midi-69)/12), fm=fc*ratOf(p.mrat);
   const car=ac.createOscillator(); car.type="sine"; car.frequency.value=fc;
   const mod=ac.createOscillator(); mod.type="sine"; mod.frequency.value=fm;
   const mg=ac.createGain(), amp=ac.createGain(), pan=ac.createStereoPanner();
@@ -305,19 +287,27 @@ function sched(){
 
 const $=function(i){ return document.getElementById(i); };
 
-/* 依視窗寬度算出整數格寬，剩餘的空間靠 margin auto 平分到兩側 */
+/* 依視窗寬度算出整數格寬，其餘尺寸按固定比例推導 */
+const R={gut:2.15,tail:1.0,pad:0.33,fs:0.50,fcell:0.46,bh:0.76,dice:0.68};
 function fit(){
   const root=document.documentElement;
-  const cs=getComputedStyle(root);
-  const num=function(v){ return parseFloat(cs.getPropertyValue(v))||0; };
   const bs=getComputedStyle(document.body);
   const bodyPad=parseFloat(bs.paddingLeft)+parseFloat(bs.paddingRight);
-  const modPad=num('--pad')*2, gut=num('--gut'), tail=num('--tail');
-  const avail=root.clientWidth - bodyPad - modPad - gut - tail - 1;
-  const cw=clamp(Math.floor(avail/N),14,24);
-  root.style.setProperty('--cw',cw+'px');
-  root.style.setProperty('--strip',(cw*N)+'px');
-  root.style.setProperty('--row',(gut+cw*N+tail)+'px');
+  const avail=root.clientWidth-bodyPad-1;
+  const unit=N+R.gut+R.tail+R.pad*2;
+  const cw=clamp(Math.floor(avail/unit),14,36);
+  const gut=Math.round(cw*R.gut), tail=Math.round(cw*R.tail), pad=Math.round(cw*R.pad);
+  const set=function(k,v){ root.style.setProperty(k,v); };
+  set('--cw',cw+'px');
+  set('--gut',gut+'px');
+  set('--tail',tail+'px');
+  set('--strip',(cw*N)+'px');
+  set('--row',(gut+cw*N+tail)+'px');
+  set('--pad',pad+'px');
+  set('--fs',Math.round(cw*R.fs)+'px');
+  set('--fcell',Math.round(cw*R.fcell)+'px');
+  set('--bh',Math.round(cw*R.bh)+'px');
+  set('--dice',Math.round(cw*R.dice)+'px');
 }
 
 function play(){
@@ -332,9 +322,20 @@ function halt(){
 }
 
 /* random */
-function rv(s){ return ri(s.min,s.max); }
+function rv(s){
+  if(s.ratio){
+    /* 沿用舊版分子/分母的分布：抽 1-8 比 1-8，四捨五入到十分位，
+       落在範圍外就重抽。中位數 1.2、整數比 38%、0.5 倍數 54% */
+    for(let k=0;k<32;k++){
+      const v=Math.round(ri(1,8)/ri(1,8)*10);
+      if(v>=s.min&&v<=s.max) return v;
+    }
+    return 10;
+  }
+  return ri(s.min,s.max);
+}
 function nv(s,v){
-  const sp=Math.max(1,Math.round((s.max-s.min)*0.10));
+  const sp=s.nsp||Math.max(1,Math.round((s.max-s.min)*0.10));
   return clamp(v+ri(-sp,sp),s.min,s.max);
 }
 
@@ -422,7 +423,7 @@ function drawTrig(){
   const pv=$("v-pulses");
   pv.textContent=effP(t); pv.classList.toggle("warn",t.pulses>t.steps);
   $("v-rot").textContent=t.rot;
-  $("v-oct").textContent=(t.oct>0?"+":"")+t.oct;
+  $("v-oct").textContent=t.oct;
   $("mute").classList.toggle("on",t.mute);
   diceSvg($("dtrk"), t.reroll?6:3);
   $("dtrk").title=t.reroll?"REROLL TRACK":"NUDGE TRACK";
@@ -519,8 +520,25 @@ function frame(){
 
 $("play").onclick=function(){ S.playing?halt():play(); };
 $("mute").onclick=function(){ const t=S.tracks[S.sel]; t.mute=!t.mute; drawTrig(); };
-$("b-root").onclick=function(){ S.root=(S.root+1)%12; hdr(); drawLane(SPEC[0]); };
-$("b-scale").onclick=function(){ S.scale=(S.scale+1)%SCALES.length; hdr(); drawLane(SPEC[0]); };
+/* 按住往上／往下滑動切換，單純點一下不動作 */
+function bindPick(el,get,set,count){
+  let on=false,y0=0,v0=0;
+  el.addEventListener("pointerdown",function(e){
+    on=true; y0=e.clientY; v0=get();
+    el.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  el.addEventListener("pointermove",function(e){
+    if(!on) return;
+    const d=Math.round((y0-e.clientY)/11);
+    const x=((v0+d)%count+count)%count;
+    if(x!==get()){ set(x); hdr(); drawLane(SPEC[0]); }
+  });
+  function up(){ on=false; }
+  el.addEventListener("pointerup",up);
+  el.addEventListener("pointercancel",up);
+}
+bindPick($("b-root"), function(){return S.root;}, function(v){S.root=v;}, 12);
+bindPick($("b-scale"),function(){return S.scale;},function(v){S.scale=v;}, SCALES.length);
 $("dtrk").onclick=function(){
   const t=S.tracks[S.sel];
   if(t.reroll){
@@ -554,7 +572,7 @@ document.querySelectorAll("[data-t]").forEach(function(b){
     const t=S.tracks[S.sel],k=b.dataset.t,d=+b.dataset.d;
     if(k==="pulses") t.pulses=clamp(t.pulses+d,0,16);
     if(k==="rot")    t.rot=clamp(t.rot+d,0,15);
-    if(k==="oct")    t.oct=clamp(t.oct+d,-3,3);
+    if(k==="oct")    t.oct=clamp(t.oct+d,1,6);
     drawTrig();
   };
 });
@@ -564,9 +582,8 @@ let rzt=null;
 window.addEventListener("resize",function(){
   clearTimeout(rzt);
   rzt=setTimeout(function(){
-    document.documentElement.style.removeProperty('--cw');
-    document.documentElement.style.removeProperty('--strip');
-    document.documentElement.style.removeProperty('--row');
+    ['--cw','--gut','--tail','--strip','--row','--pad','--fs','--fcell','--bh','--dice']
+      .forEach(function(k){ document.documentElement.style.removeProperty(k); });
     fit();
   },120);
 });
