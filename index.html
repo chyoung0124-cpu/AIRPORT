@@ -53,7 +53,6 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 .n.warn{color:#ff5a34}
 .play{width:calc(var(--cw)*2.1);letter-spacing:.1em;padding:0}
 .play.on{background:var(--amber);border-color:var(--amber);color:#140d00}
-.pick.tap{cursor:pointer;touch-action:auto}
 .pick{min-width:calc(var(--cw)*1.5);text-align:center;color:var(--amber);
       padding:0 3px;cursor:ns-resize;touch-action:none}
 .tabs{display:flex;flex:none}
@@ -116,7 +115,6 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       <span class="fld"><label>SWG</label><button class="stp" data-n="swing" data-d="-1">−</button><span class="n" id="v-swing"></span><button class="stp" data-n="swing" data-d="1">+</button></span>
       <button class="pick" id="b-root" title="ROOT"></button>
       <button class="pick" id="b-scale" title="SCALE"></button>
-      <button class="pick tap" id="b-rat" title="M RAT ENCODING"></button>
     </div>
   </div>
   <div class="row">
@@ -156,51 +154,36 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 "use strict";
 
 const N=16, REROLL_P=1/7;
-/* M RAT 有兩種編碼，可在標題列切換；切換時會把現有的值換算過去 */
-const RATMODE=[
-  { n:"x10", min:5, max:80, nsp:3,
-    of:function(v){ return v/10; },
-    /* 擾動走「附近但約分後分母小」的鄰居，權重 1/q。FM 的聽感距離由最簡分母 q
-       決定而不是數線距離：2.0 的鄰居 2.1 是 q=10，比跳到 1.5(q=2) 髒得多。
-       權重用 1/q 而不是 1/q^2，這樣反覆擾動的穩態分布會等於重抽的母體，
-       不會把整數比變成吸子 */
-    nudge:function(v){
-      const cand=[],w=[];
-      for(let x=Math.max(5,v-5);x<=Math.min(80,v+5);x++){
-        if(x===v) continue;
-        let a=x,b=10; while(b){ const t=a%b; a=b; b=t; }
-        const q=10/a;
-        cand.push(x); w.push(1/q);
-      }
-      let tot=0,i;
-      for(i=0;i<w.length;i++) tot+=w[i];
-      let r=Math.random()*tot;
-      for(i=0;i<cand.length;i++){ r-=w[i]; if(r<=0) return cand[i]; }
-      return cand[cand.length-1];
-    },
-    lbl:function(v){ return v<10?"0"+v:String(v); },
-    enc:function(r){ return clamp(Math.round(r*10),5,80); },
-    rnd:function(){
-      for(let k=0;k<32;k++){ const v=Math.round(ri(1,8)/ri(1,8)*10);
-        if(v>=5&&v<=80) return v; }
-      return 10;
-    } },
-  { n:"n/d", min:0, max:63, nsp:6,
-    of:function(v){ return ((v>>3)+1)/((v&7)+1); },
-    lbl:function(v){ return String((v>>3)+1)+String((v&7)+1); },
-    enc:function(r){
-      let best=0,bd=1e9;
-      for(let v=0;v<64;v++){
-        const d=Math.abs(((v>>3)+1)/((v&7)+1)-r);
-        if(d<bd){ bd=d; best=v; }
-      }
-      return best;
-    },
-    rnd:function(){ return ri(0,63); } }
-];
-let RM=0;
-function ratOf(v){ return RATMODE[RM].of(v); }
-function ratLbl(v){ return RATMODE[RM].lbl(v); }
+/* M RAT：兩位數 = 比值 ×10，05-80 → 0.5-8.0。10=1.0、15=1.5、80=8.0 */
+function ratOf(v){ return v/10; }
+function ratLbl(v){ return v<10?"0"+v:String(v); }
+
+/* 重抽沿用分子/分母的分布：抽 1-8 比 1-8 再量化到十分位，出界重抽。
+   中位數 1.2、整數比 38%、0.5 倍數 54% */
+function ratRnd(){
+  for(let k=0;k<32;k++){
+    const v=Math.round(ri(1,8)/ri(1,8)*10);
+    if(v>=5&&v<=80) return v;
+  }
+  return 10;
+}
+
+/* 擾動走「附近但約分後分母小」的鄰居，權重 1/q。FM 的聽感距離由最簡分母 q
+   決定而不是數線距離：2.0 的鄰居 2.1 是 q=10，比跳到 1.5(q=2) 髒得多。
+   用 1/q 而不是 1/q^2，這樣反覆擾動的穩態等於重抽的母體，不會把整數比變成吸子 */
+function ratNudge(v){
+  const cand=[],w=[];
+  for(let x=Math.max(5,v-5);x<=Math.min(80,v+5);x++){
+    if(x===v) continue;
+    let a=x,b=10; while(b){ const t=a%b; a=b; b=t; }
+    cand.push(x); w.push(a/10);
+  }
+  let tot=0,i;
+  for(i=0;i<w.length;i++) tot+=w[i];
+  let r=Math.random()*tot;
+  for(i=0;i<cand.length;i++){ r-=w[i]; if(r<=0) return cand[i]; }
+  return cand[cand.length-1];
+}
 
 const NOTE=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const SCALES=[
@@ -461,7 +444,7 @@ function buildW(s){
 SPEC.forEach(function(s){ s._w=buildW(s); });
 
 function rv(s){
-  if(s.ratio) return RATMODE[RM].rnd();
+  if(s.ratio) return ratRnd();
   const w=s._w;
   let tot=0,i;
   for(i=0;i<w.length;i++) tot+=w[i];
@@ -471,7 +454,7 @@ function rv(s){
 }
 
 function nv(s,v){
-  if(s.ratio && RATMODE[RM].nudge) return RATMODE[RM].nudge(v);
+  if(s.ratio) return ratNudge(v);
   const sp=s.nsp||Math.max(1,Math.round((s.max-s.min)*0.10));
   const c=v+ri(-sp,sp);
   /* 出界就不動，不能 clamp：clamp 會讓提議不對稱，穩態會偏到端點去 */
@@ -628,23 +611,11 @@ function tabs(){
   });
 }
 
-const MRAT=SPEC.filter(function(s){ return s.id==="mrat"; })[0];
-function setRatMode(m){
-  const from=RATMODE[RM], to=RATMODE[m];
-  S.tracks.forEach(function(t){
-    const L=t.lanes.mrat;
-    for(let i=0;i<N;i++) L.vals[i]=to.enc(from.of(L.vals[i]));
-  });
-  RM=m; MRAT.min=to.min; MRAT.max=to.max; MRAT.nsp=to.nsp;
-  hdr(); drawLane(MRAT);
-}
-
 function hdr(){
   $("v-bpm").textContent=S.bpm;
   $("v-swing").textContent=S.swing;
   $("b-root").textContent=NOTE[S.root];
   $("b-scale").textContent=SCALES[S.scale].n;
-  $("b-rat").textContent=RATMODE[RM].n;
 }
 
 function frame(){
@@ -691,7 +662,6 @@ function bindPick(el,get,set,count){
   el.addEventListener("pointerup",up);
   el.addEventListener("pointercancel",up);
 }
-$("b-rat").onclick=function(){ setRatMode(RM?0:1); };
 bindPick($("b-root"), function(){return S.root;}, function(v){S.root=v;}, 12);
 bindPick($("b-scale"),function(){return S.scale;},function(v){S.scale=v;}, SCALES.length);
 $("dtrk").onclick=function(){
