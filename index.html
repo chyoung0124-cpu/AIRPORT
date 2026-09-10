@@ -35,6 +35,55 @@ body{
 .head .big{font-size:22px;line-height:22px;letter-spacing:.14em;color:var(--amber);font-weight:700}
 .head .note{color:var(--dim);letter-spacing:.14em}
 
+/* ---- 地球儀 ---- */
+.head{align-items:center}
+.head .big{background:none;border:none;padding:0;height:auto;cursor:pointer}
+.head .big:hover,.head .big:active{background:none;color:#fff;border:none}
+.loc{display:none;margin-left:calc(var(--pad)*2.4);background:none;border:none;padding:0;height:auto;
+     text-align:left;line-height:1.35;cursor:pointer}
+.loc.on{display:block}
+.loc:hover,.loc:active{background:none;border:none}
+.loc .l1{display:flex;gap:.8em;align-items:baseline}
+.loc .cd{color:var(--amber);letter-spacing:.14em}
+.loc .tm{color:var(--amber);font-family:'Manolo Mono',monospace;font-weight:400}
+.loc .l2{display:flex;gap:.8em;color:var(--dim);font-family:'Manolo Mono',monospace;font-weight:400}
+.loc .wx{color:var(--white)}
+.loc:hover .cd,.loc:hover .tm{color:#fff}
+
+.gl{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;
+    gap:calc(var(--pad)*2.5);padding:16px;background:rgba(8,8,8,.9);opacity:0;transition:opacity .16s}
+.gl.on{display:flex}
+.gl.vis{opacity:1}
+/* 用上下 auto margin 置中：內容比視窗高時可以捲動，不會像 justify-content:center 那樣把頂端切掉 */
+.gl canvas{display:block;touch-action:none;cursor:grab;margin-top:auto;flex:none}
+.gl .credit{margin-bottom:auto}
+.gl canvas.grab{cursor:grabbing}
+/* 文字一律不換行：--- 的連字號本身是斷行點，窄的時候會掉到下一行，高度就會跳 */
+/* 兩行排成一個方塊：代碼與緯度靠左，時間與經度靠右。
+   緯度、經度各自保留最長位數的寬度（89.99S、179.99W），數字變長變短時方塊不會變寬 */
+.gl .info{display:grid;grid-template-columns:auto auto;column-gap:calc(var(--pad)*2);row-gap:7px;align-items:baseline}
+.gl .info span{white-space:nowrap}
+.gl .lat{min-width:6ch}
+.gl .lon{min-width:7ch;justify-self:end;text-align:right}
+/* Manolo Mono 字的右邊自帶 0.2em 空白，抵掉後時間和經度的最後一個字才會切齊方塊右緣 */
+.gl .time{margin-right:-.2em}
+/* E 比數字窄、W 比數字寬，用相對位移補回（不影響方塊寬度），經度最後一個字才會和時間切齊 */
+.gl .lon{margin-right:-.2em;position:relative}
+.gl .lon.e{left:.056em}
+.gl .lon.w{left:-.11em}
+.gl .code{font-size:22px;line-height:22px;letter-spacing:.14em;color:var(--amber);font-weight:700}
+.gl .code.sea{color:var(--dim)}
+.gl .time{font-family:'Manolo Mono',monospace;font-weight:400;font-size:22px;line-height:22px;color:var(--amber)}
+.gl .coord{font-family:'Manolo Mono',monospace;font-weight:400;color:var(--dim)}
+.gl .time{justify-self:end}
+.gl .acts{display:flex;gap:calc(var(--pad)*1.7)}
+.gl .acts button{height:calc(var(--bh)*1.7);line-height:calc(var(--bh)*1.7 - 2px);padding:0 1.4em;letter-spacing:.14em}
+.gl .acts .land{background:var(--amber);border-color:var(--amber);color:#140d00}
+.gl .acts .land:hover{background:#fff;border-color:#fff;color:#140d00}
+.gl .credit{color:var(--dim);letter-spacing:.1em;text-decoration:none}
+.gl .credit:hover{color:var(--amber)}
+@media (prefers-reduced-motion:reduce){ .gl{transition:none} }
+
 .mod{background:var(--panel);padding:var(--pad);margin-bottom:6px}
 .hd{display:grid;grid-template-columns:var(--gut) 1fr var(--tail);align-items:center;margin-bottom:5px}
 /* TRK 標題列和 STEP 之間沒有尺標，補上同樣的高度，和 MSTR 標題列到 LEN 的距離一致 */
@@ -159,7 +208,8 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 
 <div class="rack">
 <div class="head">
-  <div class="big">JETLAG</div>
+  <button class="big" id="b-globe" title="選擇地點">JETLAG</button>
+  <button class="loc" id="b-loc" title="回到地球儀"><span class="l1"><span class="cd" id="loc-cd"></span><span class="tm" id="loc-tm"></span><span class="tm" id="loc-tp"></span></span><span class="l2"><span id="loc-co"></span><span class="wx" id="loc-wx"></span></span></button>
 </div>
 
 <div class="mod">
@@ -207,6 +257,19 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 </div>
 
 <div class="mod" id="lanes"></div>
+</div>
+
+<div class="gl" id="gl" role="dialog" aria-modal="true" aria-label="選擇地點">
+  <canvas id="gcv"></canvas>
+  <div class="info" id="ginfo">
+    <span class="code" id="g-code"></span><span class="time" id="g-time"></span>
+    <span class="coord lat" id="g-lat"></span><span class="coord lon" id="g-lon"></span>
+  </div>
+  <div class="acts">
+    <button id="g-back">BACK</button>
+    <button class="land" id="g-land">LAND</button>
+  </div>
+  <a class="credit" href="https://open-meteo.com/" target="_blank" rel="noopener">WEATHER DATA BY OPEN-METEO.COM</a>
 </div>
 
 <script>
@@ -296,7 +359,7 @@ function makeTrack(i){
   return t;
 }
 
-const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shot:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
+const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shot:null,loc:null,wx:null,wxState:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
          tracks:[0,1,2,3].map(makeTrack)};
 
 /* PITCH = 音階裡的第幾個音（0 = ROOT）。可用範圍隨音階長度變：MAJ/MIN 0-6、PNT 0-4、CHR 0-11。
@@ -939,6 +1002,450 @@ $("dtrk").onclick=function(){
   }
   t.reroll=nextReroll(); drawTrig(); lanes();
 };
+
+/* ---- 地球儀 ----
+   2D canvas，正射投影。畫面上是固定的點陣格子，每一格反推回球面上的經緯度，
+   查陸地點陣決定亮不亮。明暗用 Bayer 4×4 抖色換成點的疏密，光源是此刻真實的太陽位置。
+   陸地：Natural Earth 50m（公有領域）轉成 720×360 點陣，逐列 run-length 編碼。
+   城市：OpenFlights 機場資料挑選，[IATA, 緯度, 經度, 時區] */
+const LAND_W=720, LAND_H=360;
+const LAND_RLE="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";
+const CITIES=[["TPE",25.08,121.23,"Asia/Taipei"],["KHH",22.58,120.35,"Asia/Taipei"],["HKG",22.31,113.92,"Asia/Hong_Kong"],["MFM",22.15,113.59,"Asia/Macau"],["PEK",40.08,116.58,"Asia/Shanghai"],["PVG",31.14,121.81,"Asia/Shanghai"],["CAN",23.39,113.3,"Asia/Shanghai"],["CTU",30.58,103.95,"Asia/Shanghai"],["XIY",34.45,108.75,"Asia/Shanghai"],["KMG",25.1,102.93,"Asia/Shanghai"],["URC",43.91,87.47,"Asia/Shanghai"],["HRB",45.62,126.25,"Asia/Shanghai"],["ICN",37.47,126.45,"Asia/Seoul"],["HND",35.55,139.78,"Asia/Tokyo"],["KIX",34.43,135.24,"Asia/Tokyo"],["CTS",42.78,141.69,"Asia/Tokyo"],["OKA",26.2,127.65,"Asia/Tokyo"],["MNL",14.51,121.02,"Asia/Manila"],["CEB",10.31,123.98,"Asia/Manila"],["SGN",10.82,106.65,"Asia/Saigon"],["HAN",21.22,105.81,"Asia/Saigon"],["BKK",13.68,100.75,"Asia/Bangkok"],["CNX",18.77,98.96,"Asia/Bangkok"],["KUL",2.75,101.71,"Asia/Kuala_Lumpur"],["SIN",1.35,103.99,"Asia/Singapore"],["CGK",-6.13,106.66,"Asia/Jakarta"],["DPS",-8.75,115.17,"Asia/Makassar"],["RGN",16.91,96.13,"Asia/Rangoon"],["PNH",11.55,104.84,"Asia/Phnom_Penh"],["DAC",23.84,90.4,"Asia/Dhaka"],["CMB",7.18,79.88,"Asia/Colombo"],["MLE",4.19,73.53,"Indian/Maldives"],["KTM",27.7,85.36,"Asia/Katmandu"],["DEL",28.57,77.1,"Asia/Calcutta"],["BOM",19.09,72.87,"Asia/Calcutta"],["BLR",13.2,77.71,"Asia/Calcutta"],["MAA",12.99,80.17,"Asia/Calcutta"],["CCU",22.65,88.45,"Asia/Calcutta"],["KHI",24.91,67.16,"Asia/Karachi"],["LHE",31.52,74.4,"Asia/Karachi"],["KBL",34.57,69.21,"Asia/Kabul"],["TAS",41.26,69.28,"Asia/Tashkent"],["ALA",43.35,77.04,"Asia/Almaty"],["ULN",47.84,106.77,"Asia/Ulaanbaatar"],["VVO",43.4,132.15,"Asia/Vladivostok"],["YKS",62.09,129.77,"Asia/Yakutsk"],["PKC",53.17,158.45,"Asia/Kamchatka"],["SYD",-33.95,151.18,"Australia/Sydney"],["MEL",-37.67,144.84,"Australia/Melbourne"],["BNE",-27.38,153.12,"Australia/Brisbane"],["PER",-31.94,115.97,"Australia/Perth"],["ADL",-34.95,138.53,"Australia/Adelaide"],["DRW",-12.41,130.88,"Australia/Darwin"],["ASP",-23.81,133.9,"Australia/Darwin"],["AKL",-37.01,174.79,"Pacific/Auckland"],["CHC",-43.49,172.53,"Pacific/Auckland"],["NAN",-17.76,177.44,"Pacific/Fiji"],["PPT",-17.55,-149.61,"Pacific/Tahiti"],["HNL",21.32,-157.92,"Pacific/Honolulu"],["GUM",13.48,144.8,"Pacific/Guam"],["POM",-9.44,147.22,"Pacific/Port_Moresby"],["NOU",-22.01,166.21,"Pacific/Noumea"],["APW",-13.83,-172.01,"Pacific/Apia"],["TBU",-21.24,-175.15,"Pacific/Tongatapu"],["MAJ",7.06,171.27,"Pacific/Majuro"],["DXB",25.25,55.36,"Asia/Dubai"],["DOH",25.27,51.61,"Asia/Qatar"],["RUH",24.96,46.7,"Asia/Riyadh"],["JED",21.68,39.16,"Asia/Riyadh"],["MCT",23.59,58.28,"Asia/Muscat"],["TLV",32.01,34.89,"Asia/Jerusalem"],["AMM",31.72,35.99,"Asia/Amman"],["BEY",33.82,35.49,"Asia/Beirut"],["IKA",35.42,51.15,"Asia/Tehran"],["IST",41.28,28.75,"Europe/Istanbul"],["CAI",30.12,31.41,"Africa/Cairo"],["CMN",33.37,-7.59,"Africa/Casablanca"],["ALG",36.69,3.22,"Africa/Algiers"],["TUN",36.85,10.23,"Africa/Tunis"],["LOS",6.58,3.32,"Africa/Lagos"],["ACC",5.61,-0.17,"Africa/Accra"],["DKR",14.74,-17.49,"Africa/Dakar"],["ABJ",5.26,-3.93,"Africa/Abidjan"],["ADD",8.98,38.8,"Africa/Addis_Ababa"],["NBO",-1.32,36.93,"Africa/Nairobi"],["DAR",-6.88,39.2,"Africa/Dar_es_Salaam"],["KGL",-1.97,30.14,"Africa/Kigali"],["JNB",-26.14,28.25,"Africa/Johannesburg"],["CPT",-33.96,18.6,"Africa/Johannesburg"],["LAD",-8.86,13.23,"Africa/Luanda"],["FIH",-4.39,15.44,"Africa/Kinshasa"],["KRT",15.59,32.55,"Africa/Khartoum"],["MRU",-20.43,57.68,"Indian/Mauritius"],["TNR",-18.8,47.48,"Indian/Antananarivo"],["WDH",-22.48,17.47,"Africa/Windhoek"],["SEZ",-4.67,55.52,"Indian/Mahe"],["LBV",0.46,9.41,"Africa/Libreville"],["BKO",12.53,-7.95,"Africa/Bamako"],["LHR",51.47,-0.46,"Europe/London"],["CDG",49.01,2.55,"Europe/Paris"],["AMS",52.31,4.76,"Europe/Amsterdam"],["FRA",50.03,8.57,"Europe/Berlin"],["MUC",48.35,11.79,"Europe/Berlin"],["CPH",55.62,12.66,"Europe/Copenhagen"],["ARN",59.65,17.92,"Europe/Stockholm"],["OSL",60.12,11.05,"Europe/Oslo"],["HEL",60.32,24.96,"Europe/Helsinki"],["KEF",63.99,-22.61,"Atlantic/Reykjavik"],["DUB",53.42,-6.27,"Europe/Dublin"],["EDI",55.95,-3.37,"Europe/London"],["MAD",40.47,-3.56,"Europe/Madrid"],["BCN",41.3,2.08,"Europe/Madrid"],["LIS",38.78,-9.14,"Europe/Lisbon"],["FCO",41.8,12.24,"Europe/Rome"],["MXP",45.63,8.73,"Europe/Rome"],["ZRH",47.46,8.55,"Europe/Zurich"],["VIE",48.11,16.57,"Europe/Vienna"],["PRG",50.1,14.26,"Europe/Prague"],["WAW",52.17,20.97,"Europe/Warsaw"],["BUD",47.43,19.26,"Europe/Budapest"],["ATH",37.94,23.94,"Europe/Athens"],["OTP",44.57,26.09,"Europe/Bucharest"],["KBP",50.35,30.89,"Europe/Kiev"],["SVO",55.97,37.41,"Europe/Moscow"],["LED",59.8,30.26,"Europe/Moscow"],["RIX",56.92,23.97,"Europe/Riga"],["TRD",63.46,10.92,"Europe/Oslo"],["JFK",40.64,-73.78,"America/New_York"],["BOS",42.36,-71.01,"America/New_York"],["DCA",38.85,-77.04,"America/New_York"],["ORD",41.98,-87.9,"America/Chicago"],["ATL",33.64,-84.43,"America/New_York"],["MIA",25.79,-80.29,"America/New_York"],["DFW",32.9,-97.04,"America/Chicago"],["IAH",29.98,-95.34,"America/Chicago"],["DEN",39.86,-104.67,"America/Denver"],["LAS",36.08,-115.15,"America/Los_Angeles"],["LAX",33.94,-118.41,"America/Los_Angeles"],["SFO",37.62,-122.38,"America/Los_Angeles"],["SEA",47.45,-122.31,"America/Los_Angeles"],["ANC",61.17,-150.0,"America/Anchorage"],["FAI",64.82,-147.86,"America/Anchorage"],["YVR",49.19,-123.18,"America/Vancouver"],["YYZ",43.68,-79.63,"America/Toronto"],["YUL",45.47,-73.74,"America/Toronto"],["YYC",51.11,-114.02,"America/Edmonton"],["YZF",62.46,-114.44,"America/Edmonton"],["MEX",19.44,-99.07,"America/Mexico_City"],["CUN",21.04,-86.88,"America/Cancun"],["PTY",9.07,-79.38,"America/Panama"],["SJO",9.99,-84.21,"America/Costa_Rica"],["HAV",22.99,-82.41,"America/Havana"],["SJU",18.44,-66.0,"America/Puerto_Rico"],["BOG",4.7,-74.15,"America/Bogota"],["LIM",-12.02,-77.11,"America/Lima"],["SCL",-33.39,-70.79,"America/Santiago"],["EZE",-34.82,-58.54,"America/Buenos_Aires"],["GRU",-23.44,-46.47,"America/Sao_Paulo"],["GIG",-22.81,-43.25,"America/Sao_Paulo"],["MAO",-3.04,-60.05,"America/Manaus"],["CCS",10.6,-66.99,"America/Caracas"],["MVD",-34.84,-56.03,"America/Montevideo"],["LPB",-16.51,-68.19,"America/La_Paz"],["USH",-54.84,-68.3,"America/Argentina/Ushuaia"],["IPC",-27.16,-109.42,"Pacific/Easter"],["GOH",64.19,-51.68,"America/Godthab"],["LYR",78.25,15.47,"Arctic/Longyearbyen"],["PDL",37.74,-25.7,"Atlantic/Azores"],["BER",52.36,13.5,"Europe/Berlin"]];
+
+const RAD=Math.PI/180;
+const B64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function landDecode(){
+  const lut=new Uint8Array(128), m=new Uint8Array(LAND_W*LAND_H);
+  for(let i=0;i<64;i++) lut[B64.charCodeAt(i)]=i;
+  let p=0,bit=0,v=0,sh=0;
+  for(let i=0;i<LAND_RLE.length;i++){
+    const c=lut[LAND_RLE.charCodeAt(i)];
+    v|=(c&31)<<sh; sh+=5;
+    if(!(c&32)){ if(bit) m.fill(1,p,p+v); p+=v; bit^=1; v=0; sh=0; }
+  }
+  return m;
+}
+let LAND=null;
+
+/* 太陽直射點（簡化天文公式，誤差在 1 度內），回傳世界座標單位向量 */
+function sunVec(t){
+  const d=t/86400000+2440587.5-2451545.0;
+  const g=(357.529+0.98560028*d)*RAD, q=280.459+0.98564736*d;
+  const L=(q+1.915*Math.sin(g)+0.020*Math.sin(2*g))*RAD, e=(23.439-0.00000036*d)*RAD;
+  const ra=Math.atan2(Math.cos(e)*Math.sin(L),Math.cos(L)), dec=Math.asin(Math.sin(e)*Math.sin(L));
+  const lon=ra-((18.697374558+24.06570982441908*d)%24)*15*RAD;
+  return [Math.cos(dec)*Math.sin(lon), Math.sin(dec), Math.cos(dec)*Math.cos(lon)];
+}
+function vecOf(lat,lon){
+  const f=lat*RAD, l=lon*RAD;
+  return [Math.cos(f)*Math.sin(l), Math.sin(f), Math.cos(f)*Math.cos(l)];
+}
+CITIES.forEach(function(c){ c.v=vecOf(c[1],c[2]); });
+function wrapLon(x){ return ((x+180)%360+360)%360-180; }
+
+/* 當地時間：城市用時區，海上沒有時區，用經度換算太陽時 */
+const TZF={};
+function localHM(lat,lon,tz){
+  const now=new Date();
+  if(tz){
+    try{
+      const f=TZF[tz]||(TZF[tz]=new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false}));
+      return f.format(now).replace(/^24/,"00");
+    }catch(err){}
+  }
+  let m=Math.floor(now.getTime()/60000 + lon*4);
+  m=((m%1440)+1440)%1440;
+  return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+}
+function latTxt(lat){ return Math.abs(lat).toFixed(2)+(lat<0?"S":"N"); }
+function lonTxt(lon){ return Math.abs(lon).toFixed(2)+(lon<0?"W":"E"); }
+function coordTxt(lat,lon){
+  return Math.abs(lat).toFixed(2)+(lat<0?"S":"N")+" "+Math.abs(lon).toFixed(2)+(lon<0?"W":"E");
+}
+
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(function(v){ return (v+0.5)/16; });
+const GN=81, GC=(GN-1)/2, SNAP=4.5;   // 格數（奇數，中心剛好一格）、吸附半徑（度）
+const G={lat:20,lon:0,vlat:0,vlon:0,anim:null,cand:null,size:300,dpr:1,
+         ptr:null,raf:0,lastDraw:0,dirty:true,state:null};
+
+function nearestCity(lat,lon,lim){
+  const v=vecOf(lat,lon); let best=null,bd=Math.cos(lim*RAD);
+  CITIES.forEach(function(c){
+    const d=v[0]*c.v[0]+v[1]*c.v[1]+v[2]*c.v[2];
+    if(d>bd){ bd=d; best=c; }
+  });
+  return best;
+}
+
+function globeSize(){
+  const cv=$("gcv");
+  const gl=$("gl"), gap=parseFloat(getComputedStyle(gl).rowGap)||0;
+  const below=$("ginfo").offsetHeight+gl.querySelector(".acts").offsetHeight+gl.querySelector(".credit").offsetHeight;
+  const want=Math.min(window.innerWidth-24, window.innerHeight-below-gap*3-32, 560);
+  G.dpr=window.devicePixelRatio||1;
+  /* 每格整數個裝置像素，最少 3：點要能畫成完整的像素，太小會被抗鋸齒混暗 */
+  const pd=Math.max(3,Math.floor(want*G.dpr/GN));
+  G.size=pd*GN/G.dpr;
+  cv.width=pd*GN; cv.height=pd*GN;
+  cv.style.width=G.size+"px"; cv.style.height=G.size+"px";
+  G.dirty=true;
+}
+
+function drawGlobe(){
+  const cv=$("gcv"), ctx=cv.getContext("2d");
+  const p=cv.width/GN;                                   // 每格裝置像素，整數
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle="#080808";                               // 球體底色，擋住後面變暗的介面
+  ctx.beginPath(); ctx.arc(cv.width/2,cv.height/2,cv.width/2,0,6.2832); ctx.fill();
+  const cf=Math.cos(G.lat*RAD), sf=Math.sin(G.lat*RAD), cl=Math.cos(G.lon*RAD), sl=Math.sin(G.lon*RAD);
+  const sun=sunVec(Date.now());
+  const st=G.state||(G.state=new Uint8Array(GN*GN));   // 0 空 1 海 2 陸
+  st.fill(0);
+  /* 點一律用對齊整數像素的方塊拼出來（夠大時切掉四角變成圓點），不用 arc。
+     arc 的邊緣是抗鋸齒的，點只有一兩個像素大時，整顆點都會和黑底混在一起，顏色就變暗、白色變灰 */
+  const DL=Math.max(1,Math.round(p*0.7)), DS=Math.max(1,Math.round(p*0.5));
+  const dot=function(path,i,j,D){
+    const x=i*p+((p-D)>>1), y=j*p+((p-D)>>1);
+    if(D>=4){ const c=D>>2; path.rect(x,y+c,D,D-2*c); path.rect(x+c,y,D-2*c,D); }
+    else path.rect(x,y,D,D);
+  };
+  const pLand=new Path2D(), pSea=new Path2D();
+  const rim=(1-1.6/GN)*(1-1.6/GN);
+  for(let j=0;j<GN;j++){
+    const y=1-(2*j+1)/GN;
+    for(let i=0;i<GN;i++){
+      const x=(2*i+1)/GN-1, q=x*x+y*y;
+      if(q>1) continue;
+      const z=Math.sqrt(1-q);
+      const y1=y*cf+z*sf, z1=-y*sf+z*cf;
+      const X=x*cl+z1*sl, Z=-x*sl+z1*cl;
+      const row=Math.min(LAND_H-1,Math.floor((90-Math.asin(y1)/RAD)*2));
+      const col=Math.floor((Math.atan2(X,Z)/RAD+180)*2)%LAND_W;
+      const lit=X*sun[0]+y1*sun[1]+Z*sun[2];
+      const day=clamp((lit+0.12)/0.24,0,1);
+      const b=BAYER[(j&3)*4+(i&3)];
+      const k=j*GN+i;
+      if(LAND[row*LAND_W+col]){
+        if(b < (0.26+0.74*day)*(0.72+0.28*z)){ dot(pLand,i,j,DL); st[k]=2; }
+      } else if(b < 0.05+0.14*day || q>rim){ dot(pSea,i,j,DS); st[k]=1; }
+    }
+  }
+  ctx.fillStyle="#6b5000"; ctx.fill(pSea);
+  ctx.fillStyle="#f5b301"; ctx.fill(pLand);
+
+  /* 城市：白天落在陸地上挖成暗點、落在海上點成琥珀色，夜晚點成白色燈光；準星對準的城市一律白色 */
+  const pHole=new Path2D(), pDay=new Path2D(), pNight=new Path2D();
+  CITIES.forEach(function(c){
+    const X=c.v[0],Y=c.v[1],Z=c.v[2];
+    const x1=X*cl-Z*sl, z1=X*sl+Z*cl, y2=Y*cf-z1*sf, z2=Y*sf+z1*cf;
+    if(z2<0.08) return;
+    const i=Math.floor((x1+1)/2*GN), j=Math.floor((1-y2)/2*GN);
+    if(i<0||j<0||i>=GN||j>=GN) return;
+    const lit=X*sun[0]+Y*sun[1]+Z*sun[2];
+    if(c===G.cand || lit<=0.02) dot(pNight,i,j,DL);
+    else if(st[j*GN+i]===2) dot(pHole,i,j,DL);
+    else dot(pDay,i,j,DL);
+  });
+  ctx.fillStyle="#080808"; ctx.fill(pHole);
+  ctx.fillStyle="#f5b301"; ctx.fill(pDay);
+  ctx.fillStyle="#ffffff"; ctx.fill(pNight);
+
+  /* 準星：中心四個方向各兩格。每格先鋪一塊比格子大一圈的純黑，再放整格大小的純白，
+     同一條臂的兩格會連成一段白條、外面包著黑框 */
+  const e=Math.max(1,Math.round(p*0.2)), DW=p-2*Math.floor(p*0.12);
+  const edge=new Path2D(), ret=new Path2D();
+  [[2,0],[3,0],[-2,0],[-3,0],[0,2],[0,3],[0,-2],[0,-3]].forEach(function(o){
+    const i=GC+o[0], j=GC+o[1];
+    edge.rect(i*p-e,j*p-e,p+2*e,p+2*e);
+    dot(ret,i,j,DW);
+  });
+  ctx.fillStyle="#000000"; ctx.fill(edge);
+  ctx.fillStyle="#ffffff"; ctx.fill(ret);
+  G.lastDraw=Date.now(); G.dirty=false;
+}
+
+function setLon(lon){
+  const el=$("g-lon");
+  el.textContent=lonTxt(lon);
+  el.classList.toggle("w",lon<0); el.classList.toggle("e",lon>=0);
+}
+function globeInfo(){
+  const c=G.cand;
+  const code=$("g-code");
+  if(c){
+    code.textContent=c[0]; code.classList.remove("sea");
+    $("g-time").textContent=localHM(c[1],c[2],c[3]);
+    $("g-lat").textContent=latTxt(c[1]); setLon(c[2]);
+  } else {
+    code.textContent="---"; code.classList.add("sea");
+    $("g-time").textContent=localHM(G.lat,G.lon,null);
+    $("g-lat").textContent=latTxt(G.lat); setLon(G.lon);
+  }
+}
+
+function globeGo(lat,lon){
+  let dl=wrapLon(lon-G.lon);
+  G.anim={a0:G.lat,o0:G.lon,a1:clamp(lat,-85,85),od:dl,t0:performance.now(),dur:300};
+  G.vlat=G.vlon=0;
+}
+/* 停下來時，準星附近有城市就轉過去對準 */
+function globeSettle(){
+  const c=nearestCity(G.lat,G.lon,SNAP);
+  if(c && (Math.abs(c[1]-G.lat)>0.01 || Math.abs(wrapLon(c[2]-G.lon))>0.01)) globeGo(c[1],c[2]);
+}
+
+function globeTick(now){
+  if(!$("gl").classList.contains("on")){ G.raf=0; return; }
+  if(G.anim){
+    const a=G.anim, t=clamp((now-a.t0)/a.dur,0,1), e=1-Math.pow(1-t,3);
+    G.lat=a.a0+(a.a1-a.a0)*e; G.lon=wrapLon(a.o0+a.od*e);
+    if(t>=1) G.anim=null;
+    G.dirty=true;
+  } else if(!G.ptr && (Math.abs(G.vlat)>0.01 || Math.abs(G.vlon)>0.01)){
+    G.lat=clamp(G.lat+G.vlat,-85,85); G.lon=wrapLon(G.lon+G.vlon);
+    G.vlat*=0.9; G.vlon*=0.9;
+    if(Math.abs(G.vlat)<=0.01 && Math.abs(G.vlon)<=0.01){ G.vlat=G.vlon=0; globeSettle(); }
+    G.dirty=true;
+  }
+  if(G.dirty || Date.now()-G.lastDraw>30000){
+    if(!G.anim) G.cand=nearestCity(G.lat,G.lon,SNAP);
+    drawGlobe();
+  }
+  globeInfo();
+  G.raf=requestAnimationFrame(globeTick);
+}
+
+function globeOpen(){
+  if(!LAND) LAND=landDecode();
+  if(S.loc){ G.lat=S.loc.lat; G.lon=S.loc.lon; }
+  else {
+    let tz=""; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone; }catch(err){}
+    const home=CITIES.find(function(c){ return c[3]===tz; });
+    if(home){ G.lat=home[1]; G.lon=home[2]; }
+    else { G.lat=20; G.lon=wrapLon(-new Date().getTimezoneOffset()/4); }
+  }
+  G.vlat=G.vlon=0; G.anim=null; G.cand=nearestCity(G.lat,G.lon,SNAP);
+  const gl=$("gl");
+  gl.classList.add("on");
+  document.documentElement.style.overflow="hidden";
+  globeSize(); drawGlobe(); globeInfo();
+  requestAnimationFrame(function(){ gl.classList.add("vis"); });
+  $("g-land").focus({preventScroll:true});
+  if(!G.raf) G.raf=requestAnimationFrame(globeTick);
+}
+function globeClose(){
+  const gl=$("gl");
+  gl.classList.remove("vis","on");
+  document.documentElement.style.overflow="";
+  $("b-globe").focus({preventScroll:true});
+}
+/* ---- 地點 → 序列 ----
+   按下 LAND 後抓 Open-Meteo 的即時天氣，連同經緯度、當地時間、太陽位置，一次覆寫整個序列。
+   沒有任何亂數：同一個地點、同一分鐘、同樣的天氣，得到的序列一定相同 */
+const WX_VARS="temperature_2m,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m";
+/* 抓不到天氣時用國際標準大氣的海平面條件（15°C、1013 hPa），其餘取無風、無雨、半雲 */
+const WX_STD={temperature_2m:15,relative_humidity_2m:50,precipitation:0,weather_code:2,cloud_cover:50,
+              pressure_msl:1013,wind_speed_10m:0,wind_direction_10m:0,wind_gusts_10m:0};
+
+function fetchWx(lat,lon){
+  const url="https://api.open-meteo.com/v1/forecast?latitude="+lat.toFixed(2)+"&longitude="+lon.toFixed(2)+"&current="+WX_VARS;
+  const ctl=window.AbortController?new AbortController():null;
+  const tm=setTimeout(function(){ if(ctl) ctl.abort(); },6000);
+  return fetch(url,ctl?{signal:ctl.signal}:{})
+    .then(function(r){ return r.ok?r.json():Promise.reject(r.status); })
+    .then(function(j){ clearTimeout(tm); if(!j||!j.current) throw 0; return j.current; })
+    .catch(function(){ clearTimeout(tm); return null; });
+}
+
+/* WMO 天氣代碼 → 航空氣象報告（METAR）的縮寫，和 SCALE */
+function wxKind(code){
+  if(code===0)  return {m:"CLR", sc:0};
+  if(code===1)  return {m:"FEW", sc:0};
+  if(code===2)  return {m:"SCT", sc:3};
+  if(code===3)  return {m:"OVC", sc:2};
+  if(code===45||code===48) return {m:"FG", sc:6};
+  if(code>=51&&code<=57) return {m:"DZ", sc:1};
+  if(code>=61&&code<=67) return {m:"RA", sc:1};
+  if(code>=71&&code<=77) return {m:"SN", sc:5};
+  if(code>=80&&code<=82) return {m:"SHRA", sc:1};
+  if(code===85||code===86) return {m:"SHSN", sc:5};
+  if(code>=95) return {m:"TS", sc:4};
+  return {m:"---", sc:3};
+}
+
+/* 時區相對 UTC 的分鐘數；海上沒有時區，用太陽時（經度每度 4 分鐘），和顯示的時間一致 */
+function offsetMin(L){
+  if(L.tz){
+    try{
+      const now=new Date(), o={};
+      new Intl.DateTimeFormat("en-US",{timeZone:L.tz,hourCycle:"h23",year:"numeric",month:"2-digit",
+        day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(now).forEach(function(p){ o[p.type]=p.value; });
+      const asUTC=Date.UTC(+o.year,+o.month-1,+o.day,(+o.hour)%24,+o.minute);
+      return Math.round((asUTC-Math.floor(now.getTime()/60000)*60000)/60000);
+    }catch(err){}
+  }
+  return Math.round(L.lon*4);
+}
+function sunElev(lat,lon){
+  const v=vecOf(lat,lon), s=sunVec(Date.now());
+  return Math.asin(clamp(v[0]*s[0]+v[1]*s[1]+v[2]*s[2],-1,1))/RAD;
+}
+/* 今天的日照長度（小時），含大氣折射的 -0.83° */
+function dayLen(lat){
+  const s=sunVec(Date.now()), dec=Math.asin(s[1]), f=lat*RAD;
+  const c=(Math.sin(-0.833*RAD)-Math.sin(f)*Math.sin(dec))/(Math.cos(f)*Math.cos(dec));
+  if(c<=-1) return 24;
+  if(c>=1) return 0;
+  return 2*Math.acos(c)/RAD/15;
+}
+function digits(str){ return str.replace(/[^0-9]/g,"").split("").map(Number).slice(0,16); }
+const RATS=[10,20,30,40,15,25,35,50,12,14,16,18,11,13,17,19];   // 由簡單到複雜的 FM 比值（×10）
+
+function mapPlace(L,w){
+  const wx=w||WX_STD, k=wxKind(wx.weather_code);
+  const hm=localHM(L.lat,L.lon,L.tz), hh=+hm.slice(0,2), mm=+hm.slice(3,5);
+  const elev=sunElev(L.lat,L.lon), dl=dayLen(L.lat);
+  const off=offsetMin(L), lag=Math.round((off+new Date().getTimezoneOffset())/60);
+  const temp=wx.temperature_2m, hum=wx.relative_humidity_2m, rain=Math.max(0,wx.precipitation),
+        cloud=wx.cloud_cover, wind=wx.wind_speed_10m, gust=Math.max(wind,wx.wind_gusts_10m),
+        dir=wx.wind_direction_10m, pres=wx.pressure_msl;
+
+  S.bpm=Math.round(clamp(100+temp,70,150));                      // −20°C→80、40°C→140
+  S.swing=Math.round(50+clamp(wind,0,60)/60*25);                 // 無風 50、60 km/h 以上 75
+  S.root=((hh%12)*7)%12;                                         // 鐘面 12 格沿五度圈排：12 點 C、1 點 G、2 點 D…
+  S.scale=k.sc;
+  S.mlen=16; S.free=false;
+  const SL=SCALES[S.scale].s.length;
+
+  const ew=-Math.sin(dir*RAD);                                   // 風往東吹為正
+  const drift = (wind>=15 && Math.abs(ew)>0.35) ? (ew>0?2:0) : -1;
+  const ratBase=Math.round(clamp((1030-pres)/55,0,1)*15);        // 1030 hPa 以上最單純，975 hPa 以下最複雜
+
+  const R=[
+    { /* 1 太陽：緯度決定日照長短 */
+      steps:16, pulses:clamp(Math.round(dl/24*16),1,16), rot:0, rate:16,
+      oct: elev<0?3:(elev<30?4:5), pit:digits(latTxt(L.lat)), pan:1, lvl:80, rat:RATS[ratBase] },
+    { /* 2 經度：時區與時差 */
+      steps:16, pulses:clamp(Math.round(Math.abs(off)/60),1,16), rot:((lag%16)+16)%16, rate:16,
+      oct:4, pit:digits(lonTxt(L.lon)), pan: drift<0?0:drift, lvl:65, rat:RATS[Math.min(15,ratBase+1)] },
+    { /* 3 當地時間：12 格鐘面，時針打點，分針轉位 */
+      steps:12, pulses:(hh%12)||12, rot:Math.floor(mm/5), rate:16,
+      oct:2, pit:digits(hm), pan:1, lvl:90, rat:RATS[ratBase] },
+    { /* 4 天氣：雲量與雨量決定密度，風向決定轉位，下雨切 32 分 */
+      steps:16, pulses:clamp(1+Math.round(cloud/100*7)+Math.round(Math.min(rain,2)*4),1,16),
+      rot:Math.round(dir/360*16)%16, rate: rain>0?32:16,
+      oct: temp<5?3:(temp<25?4:5), pit:digits(Math.abs(temp).toFixed(1)), pan: drift<0?2:drift,
+      lvl:clamp(55+Math.round(Math.min(rain,4)*10),0,99), rat:RATS[Math.min(15,ratBase+2)] }
+  ];
+  const atk=Math.round(25*(1-clamp(gust/80,0,1)));               // 陣風越強起音越硬
+  const dec=Math.round(15+hum*0.6);                              // 越潮濕尾巴越長
+  const end=Math.round(clamp((hum-40)/60,0,1)*50);
+  const idx=Math.round(8+clamp((elev+12)/72,0,1)*72);            // 太陽 −12° 以下最暗，60° 以上最亮
+  const fdk=Math.min(99,Math.round(clamp(rain/10,0,1)*50)+(k.m==="TS"?30:0));
+  const mdec=Math.round(10+cloud*0.6);
+  const mend=Math.round(clamp(elev,0,60)/60*40);
+
+  S.tracks.forEach(function(t,i){
+    const r=R[i];
+    t.mute=false; t.solo=false;
+    t.steps=r.steps; t.pulses=r.pulses; t.rot=r.rot%r.steps; t.rate=r.rate; t.oct=r.oct;
+    const set=function(id,vals){
+      const Ln=t.lanes[id];
+      Ln.mode="T"; Ln.idx=0; Ln.len=vals.length;
+      Ln.vals=new Array(N).fill(vals[vals.length-1]);
+      vals.forEach(function(v,j){ Ln.vals[j]=v; });
+    };
+    set("pitch", (r.pit.length?r.pit:[0]).map(function(d){ return d%SL; }));
+    set("pan",[r.pan]); set("lvl",[r.lvl]);
+    set("atk",[atk]); set("dec",[dec]); set("end",[end]);
+    set("midx",[idx]); set("mrat",[r.rat]); set("mfdk",[fdk]);
+    set("matk",[atk]); set("mdec",[mdec]); set("mend",[mend]);
+  });
+}
+
+let landSeq=0;
+function landApply(L){
+  const my=++landSeq;
+  S.wx=null; S.wxState="load"; drawLoc();
+  fetchWx(L.lat,L.lon).then(function(w){
+    if(my!==landSeq) return;
+    S.wx=w; S.wxState=w?"ok":"none";
+    snap();
+    mapPlace(L,w);
+    hdr(); drawLen(); drawTrig(); lanes(); drawLoc();
+  });
+}
+
+function globeLand(){
+  const c=G.cand;
+  S.loc = c ? {code:c[0],lat:c[1],lon:c[2],tz:c[3]}
+            : {code:null,lat:Math.round(G.lat*100)/100,lon:Math.round(G.lon*100)/100,tz:null};
+  globeClose(); landApply(S.loc);
+}
+function drawLoc(){
+  const b=$("b-loc"), L=S.loc;
+  b.classList.toggle("on",!!L);
+  if(!L) return;
+  $("loc-cd").textContent=L.code||"---";
+  $("loc-tm").textContent=localHM(L.lat,L.lon,L.tz);
+  $("loc-co").textContent=coordTxt(L.lat,L.lon);
+  const w=S.wx;
+  $("loc-tp").textContent = w ? w.temperature_2m.toFixed(1)+"C" : "";
+  $("loc-wx").textContent = S.wxState==="load" ? "..." : (w ? wxKind(w.weather_code).m : "NO WX");
+}
+
+(function(){
+  const cv=$("gcv");
+  let x0=0,y0=0,lx=0,ly=0,lt=0,moved=0,t0=0;
+  cv.addEventListener("pointerdown",function(e){
+    G.ptr=e.pointerId; G.anim=null; G.vlat=G.vlon=0;
+    x0=lx=e.clientX; y0=ly=e.clientY; lt=t0=performance.now(); moved=0;
+    cv.setPointerCapture(e.pointerId); cv.classList.add("grab"); e.preventDefault();
+  });
+  cv.addEventListener("pointermove",function(e){
+    if(G.ptr!==e.pointerId) return;
+    const k=1/RAD/(G.size/2);                // 中心附近手指移動多少，地表就跟著移動多少
+    const dx=e.clientX-lx, dy=e.clientY-ly, now=performance.now(), dt=Math.max(1,now-lt);
+    moved=Math.max(moved,Math.abs(e.clientX-x0),Math.abs(e.clientY-y0));
+    G.lon=wrapLon(G.lon-dx*k); G.lat=clamp(G.lat+dy*k,-85,85);
+    G.vlon=0.6*G.vlon+0.4*(-dx*k*16/dt); G.vlat=0.6*G.vlat+0.4*(dy*k*16/dt);
+    lx=e.clientX; ly=e.clientY; lt=now; G.dirty=true;
+  });
+  function up(e){
+    if(G.ptr!==e.pointerId) return;
+    G.ptr=null; cv.classList.remove("grab");
+    if(performance.now()-lt>80){ G.vlat=G.vlon=0; }
+    if(moved<5){
+      /* 點一下：把點到的位置轉到中心 */
+      G.vlat=G.vlon=0;
+      const rc=cv.getBoundingClientRect();
+      const x=(e.clientX-rc.left)/rc.width*2-1, y=1-(e.clientY-rc.top)/rc.height*2, q=x*x+y*y;
+      if(q<=1){
+        const z=Math.sqrt(1-q), cf=Math.cos(G.lat*RAD), sf=Math.sin(G.lat*RAD), cl=Math.cos(G.lon*RAD), sl=Math.sin(G.lon*RAD);
+        const y1=y*cf+z*sf, z1=-y*sf+z*cf, X=x*cl+z1*sl, Z=-x*sl+z1*cl;
+        const lat=Math.asin(y1)/RAD, lon=Math.atan2(X,Z)/RAD;
+        const c=nearestCity(lat,lon,SNAP);
+        if(c) globeGo(c[1],c[2]); else globeGo(lat,lon);
+      }
+    } else if(G.vlat===0 && G.vlon===0) globeSettle();
+  }
+  cv.addEventListener("pointerup",up);
+  cv.addEventListener("pointercancel",up);
+  $("gl").addEventListener("pointerdown",function(e){ if(e.target===$("gl")) globeClose(); });
+  $("g-back").onclick=globeClose;
+  $("g-land").onclick=globeLand;
+  $("b-globe").onclick=globeOpen;
+  $("b-loc").onclick=globeOpen;
+  document.addEventListener("keydown",function(e){
+    if(!$("gl").classList.contains("on")) return;
+    if(e.key==="Escape"){ globeClose(); return; }
+    const m={ArrowLeft:[0,-5],ArrowRight:[0,5],ArrowUp:[5,0],ArrowDown:[-5,0]}[e.key];
+    if(m){ e.preventDefault(); globeGo(G.lat+m[0],G.lon+m[1]); setTimeout(globeSettle,320); }
+  });
+  window.addEventListener("resize",function(){ if($("gl").classList.contains("on")) globeSize(); });
+  setInterval(function(){ if(S.loc) drawLoc(); },10000);
+})();
 
 $("b-undo").classList.add("dead");
 hdr(); tabs(); ruler(); drawLen(); drawTrig(); lanes(); fit(); frame();
