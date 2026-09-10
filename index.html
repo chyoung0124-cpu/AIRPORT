@@ -26,7 +26,7 @@ html,body{margin:0;padding:0}
 body{
   background:var(--board);color:var(--white);
   font:var(--fs)/1 'Doto',ui-monospace,Menlo,Consolas,monospace;font-weight:600;
-  padding:14px 8px 24px;
+  padding:14px max(4px,env(safe-area-inset-right)) 24px max(4px,env(safe-area-inset-left));
   -webkit-text-size-adjust:100%;
 }
 .rack{width:calc(var(--row) + var(--pad)*2);margin:0 auto}
@@ -37,20 +37,29 @@ body{
 
 .mod{background:var(--panel);padding:var(--pad);margin-bottom:6px}
 .hd{display:grid;grid-template-columns:var(--gut) 1fr var(--tail);align-items:center;margin-bottom:5px}
+/* TRK 標題列和 STEP 之間沒有尺標，補上同樣的高度，和 MSTR 標題列到 LEN 的距離一致 */
+.hd.far{margin-bottom:calc(var(--cw)*0.4 + 8px)}
 .hd .cap{letter-spacing:.14em;color:var(--dim)}
-.ctl{display:flex;align-items:center;gap:calc(var(--pad)*0.9);flex-wrap:wrap;row-gap:4px}
-.fld{display:flex;align-items:center;gap:1px;flex:none}
-.fld label{color:var(--dim);margin-right:2px;letter-spacing:.1em}
+.ctl{--g:calc(var(--pad)*1.7);display:flex;align-items:center;gap:var(--g);flex-wrap:wrap;row-gap:4px}
+/* TRK 那排右邊沒有按鈕，參數區直接延伸到最右，才放得下較寬的間距 */
+.ctl.wide{grid-column:2 / 4}
+.fld{display:flex;align-items:center;gap:var(--g);flex:none}
+/* 標籤置中在前一個元件和數字格之間：Doto 字右邊自帶 0.105em 空白，再加 0.1em 字距，用負 margin 抵掉 */
+.fld label{color:var(--dim);margin-right:-.205em;letter-spacing:.1em}
 button{font:inherit;font-weight:600;color:var(--white);background:var(--cell);
        border:1px solid #3d3d3d;cursor:pointer;padding:0 4px;
        height:var(--bh);line-height:calc(var(--bh) - 2px);border-radius:0;flex:none}
 button:hover{background:#3d3d3d;color:var(--amber)}
 button:active{background:var(--amber);color:#140d00;border-color:var(--amber)}
 button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
-.stp{width:calc(var(--bh) - 1px);padding:0;text-align:center}
-.n{min-width:calc(var(--cw)*1.2);text-align:center;display:inline-block;color:var(--amber);
-   font-family:'Manolo Mono',monospace;font-weight:400;padding-left:.2em}
-.n.warn{color:#ff5a34}
+/* 數值欄：標籤＋數字整塊都能按住上下拖。寬度照最多幾位數固定（--ch），拖動時不會跳版 */
+.fld.drag{cursor:ns-resize;touch-action:none;user-select:none;-webkit-user-select:none}
+.fld.drag label{cursor:ns-resize}
+.num{width:calc(var(--fs)*0.644*var(--ch,2) + var(--fs)*0.2 + 4px);padding:0 0 0 .2em;
+     text-align:center;color:var(--amber);cursor:ns-resize;touch-action:none;
+     font-family:'Manolo Mono',monospace;font-weight:400}
+.num.warn{color:#ff5a34}
+.held .num,.pick.held{background:var(--amber);color:#140d00;border-color:var(--amber)}
 .play{width:calc(var(--cw)*2.1);letter-spacing:.1em;padding:0}
 .play.on{background:var(--amber);border-color:var(--amber);color:#140d00}
 .pick{min-width:calc(var(--cw)*1.5);text-align:center;color:var(--amber);
@@ -100,7 +109,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 .snap:active{background:none}
 .snap:hover .ol{display:none}
 .snap:hover .fl{display:inline}
-.solo.on{background:#4fb0ff;color:#00121f;border-color:#4fb0ff}
+.solo.on{background:var(--amber);color:#140d00;border-color:var(--amber)}
 .tap{cursor:pointer;touch-action:auto}
 .tog{}
 .tap.dead{color:#3a3a3a}
@@ -158,8 +167,8 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
     <span class="cap">MSTR</span>
     <div class="ctl">
       <button class="play" id="play">PLAY</button>
-      <span class="fld"><label>BPM</label><button class="stp" data-n="bpm" data-d="-1">−</button><span class="n" id="v-bpm"></span><button class="stp" data-n="bpm" data-d="1">+</button></span>
-      <span class="fld"><label>SWG</label><button class="stp" data-n="swing" data-d="-1">−</button><span class="n" id="v-swing"></span><button class="stp" data-n="swing" data-d="1">+</button></span>
+      <span class="fld drag" id="f-bpm"><label>BPM</label><button class="num" id="v-bpm" style="--ch:3" title="按住上下拖曳"></button></span>
+      <span class="fld drag" id="f-swing"><label>SWG</label><button class="num" id="v-swing" style="--ch:2" title="按住上下拖曳"></button></span>
       <button class="pick" id="b-root" title="ROOT"></button>
       <button class="pick" id="b-scale" title="SCALE"></button>
       <button class="icn tap" id="b-undo" title="UNDO"><svg><use href="#undo"/></svg></button>
@@ -179,17 +188,16 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 </div>
 
 <div class="mod">
-  <div class="hd">
+  <div class="hd far">
     <span class="cap">TRK</span>
-    <div class="ctl">
+    <div class="ctl wide">
       <span class="tabs" id="tabs"></span>
-      <span class="fld"><label>PLS</label><button class="stp" data-t="pulses" data-d="-1">−</button><span class="n" id="v-pulses"></span><button class="stp" data-t="pulses" data-d="1">+</button></span>
-      <span class="fld"><label>ROT</label><button class="stp" data-t="rot" data-d="-1">−</button><span class="n" id="v-rot"></span><button class="stp" data-t="rot" data-d="1">+</button></span>
-      <span class="fld"><label>OCT</label><button class="stp" data-t="oct" data-d="-1">−</button><span class="n" id="v-oct"></span><button class="stp" data-t="oct" data-d="1">+</button></span>
+      <span class="fld drag" id="f-pulses"><label>PLS</label><button class="num" id="v-pulses" style="--ch:2" title="按住上下拖曳"></button></span>
+      <span class="fld drag" id="f-rot"><label>ROT</label><button class="num" id="v-rot" style="--ch:2" title="按住上下拖曳"></button></span>
+      <span class="fld drag" id="f-oct"><label>OCT</label><button class="num" id="v-oct" style="--ch:2" title="按住上下拖曳"></button></span>
       <button class="mute" id="mute">MUTE</button>
       <button class="solo" id="solo">SOLO</button>
     </div>
-    <span></span>
   </div>
   <div class="row">
     <span class="gut">STEP</span>
@@ -205,7 +213,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 "use strict";
 
 const N=16, REROLL_P=1/7;
-/* M RAT：兩位數 = 比值 ×10，05-80 → 0.5-8.0。10=1.0、15=1.5、80=8.0 */
+/* MRAT：兩位數 = 比值 ×10，05-80 → 0.5-8.0。10=1.0、15=1.5、80=8.0 */
 function ratOf(v){ return v/10; }
 function ratLbl(v){ return v<10?"0"+v:String(v); }
 
@@ -252,18 +260,18 @@ const SCALES=[
    rd = 重抽與擾動共用的分布形狀：
         p<1 偏高、p>1 偏低、tri 中間高、w 離散權重、z 在最小值多加一塊機率 */
 const SPEC=[
-  {id:"pitch", label:"PITCH", min:-9, max:9,  def:0,  len:4, note:true, rd:{tri:1}},
+  {id:"pitch", label:"PIT",   min:0,  max:11, def:0,  len:4, note:true, rd:{tri:1}},
   {id:"pan",   label:"PAN",   min:0,  max:2,  def:1,  len:1, enm:["L","C","R"], rd:{w:[1,2,1]}},
   {id:"lvl",   label:"LVL",   min:0,  max:99, def:80, len:3, rd:{p:0.45}},
   {id:"atk",   label:"ATK",   min:0,  max:99, def:2,  len:1, rd:{p:3.5,z:0.35}},
   {id:"dec",   label:"DEC",   min:0,  max:99, def:45, len:2, rd:{tri:1}},
   {id:"end",   label:"END",   min:0,  max:99, def:0,  len:1, rd:{p:2.5,z:0.40}},
-  {id:"midx",  label:"M IDX", min:0,  max:99, def:40, len:5, rd:{p:1.5}},
-  {id:"mrat",  label:"M RAT", min:5,  max:80, def:20, len:1, ratio:true, nsp:3},
-  {id:"mfdk",  label:"M FDK", min:0,  max:99, def:0,  len:1, rd:{p:1.3,z:0.30}},
-  {id:"matk",  label:"M ATK", min:0,  max:99, def:0,  len:1, rd:{p:3.5,z:0.45}},
-  {id:"mdec",  label:"M DEC", min:0,  max:99, def:35, len:1, rd:{tri:1}},
-  {id:"mend",  label:"M END", min:0,  max:99, def:10, len:1, rd:{p:2.5,z:0.40}}
+  {id:"midx",  label:"IDX",   min:0,  max:99, def:40, len:5, rd:{p:1.5}},
+  {id:"mrat",  label:"MRAT",  min:5,  max:80, def:20, len:1, ratio:true, nsp:3},
+  {id:"mfdk",  label:"MFDK",  min:0,  max:99, def:0,  len:1, rd:{p:1.3,z:0.30}},
+  {id:"matk",  label:"MATK",  min:0,  max:99, def:0,  len:1, rd:{p:3.5,z:0.45}},
+  {id:"mdec",  label:"MDEC",  min:0,  max:99, def:35, len:1, rd:{tri:1}},
+  {id:"mend",  label:"MEND",  min:0,  max:99, def:10, len:1, rd:{p:2.5,z:0.40}}
 ];
 
 function ri(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
@@ -277,7 +285,7 @@ function makeTrack(i){
   SPEC.forEach(function(s){
     t.lanes[s.id]={len:s.len,idx:0,mode:"T",vals:new Array(N).fill(s.def),reroll:nextReroll()};
   });
-  const ps=[[0,0,4,2],[0,2,4,6,3],[-7,0,-7],[7,5,4,2]];
+  const ps=[[0,0,4,2],[0,2,4,6,3],[0,0,4],[6,5,4,2]];
   ps[i].forEach(function(v,k){ t.lanes.pitch.vals[k]=v; });
   t.lanes.pitch.len=ps[i].length;
   t.lanes.lvl.len=[3,4,5,3][i];
@@ -291,10 +299,14 @@ function makeTrack(i){
 const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shot:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
          tracks:[0,1,2,3].map(makeTrack)};
 
-function degToSemi(d){
-  const sc=SCALES[S.scale].s, L=sc.length;
-  const oct=Math.floor(d/L), i=d-oct*L;
-  return sc[i]+12*oct+S.root;
+/* PITCH = 音階裡的第幾個音（0 = ROOT）。可用範圍隨音階長度變：MAJ/MIN 0-6、PNT 0-4、CHR 0-11。
+   換到較短的音階時，存著的大值不改寫，讀取時夾到最高那一級，換回來原值還在。
+   最後的音名一律折回 C-B，所以實際音高必定落在這條軌 OCT 那個八度裡：OCT 3 + E = E3 */
+function pHi(){ return SCALES[S.scale].s.length-1; }
+function hiOf(s){ return s.note ? pHi() : s.max; }
+function degToPc(d){
+  const sc=SCALES[S.scale].s;
+  return (sc[Math.min(d,sc.length-1)]+S.root)%12;
 }
 function effP(t){ return Math.min(t.pulses,t.steps); }
 /* 一個 master step 內，這條軌會走到的 euclid 位置與時間偏移（0 或 0.5 格） */
@@ -402,7 +414,7 @@ const PANL=[0.94,0.707,0.34], PANR=[0.34,0.707,0.94];
 
 function note(t0,p,gate,oct){
   if(!ready||!node) return;
-  const midi=12*(oct+1)+degToSemi(p.pitch);
+  const midi=12*(oct+1)+degToPc(p.pitch);
   const fc=440*Math.pow(2,(midi-69)/12);
   const sr=ac.sampleRate, f=p.mfdk/99;
   node.port.postMessage({
@@ -460,26 +472,46 @@ function sched(){
 
 const $=function(i){ return document.getElementById(i); };
 
-/* 依視窗寬度算出整數格寬，其餘尺寸按固定比例推導 */
-const R={gut:2.15,tail:2.4,pad:0.33,fs:0.50,fcell:0.46,bh:0.76};
+/* 依視窗寬度算出格寬，其餘尺寸按固定比例推導。
+   格寬對齊到裝置像素（3x 螢幕是 1/3 px 一階），不再只取整數 px，右邊不會剩一截沒用到。
+   左欄寬度量實際最長的標籤，再加一小段間隙 */
+const R={tail:2.4,pad:0.33,fs:0.50,fcell:0.46,bh:0.76,gap:0.25};
+function labelEm(){
+  let m=0;
+  document.querySelectorAll(".gut,.hd .cap").forEach(function(el){
+    if(!el.textContent) return;
+    const rg=document.createRange(); rg.selectNodeContents(el);
+    const fs=parseFloat(getComputedStyle(el).fontSize)||10;
+    m=Math.max(m, rg.getBoundingClientRect().width/fs);
+  });
+  return m||3.2;
+}
 function fit(){
   const root=document.documentElement;
   const bs=getComputedStyle(document.body);
   const bodyPad=parseFloat(bs.paddingLeft)+parseFloat(bs.paddingRight);
   const avail=root.clientWidth-bodyPad-1;
-  const unit=N+R.gut+R.tail+R.pad*2;
-  const cw=clamp(Math.floor(avail/unit),14,36);
-  const gut=Math.round(cw*R.gut), tail=Math.round(cw*R.tail), pad=Math.round(cw*R.pad);
-  const set=function(k,v){ root.style.setProperty(k,v); };
-  set('--cw',cw+'px');
-  set('--gut',gut+'px');
-  set('--tail',tail+'px');
-  set('--strip',(cw*N)+'px');
-  set('--row',(gut+cw*N+tail)+'px');
-  set('--pad',pad+'px');
-  set('--fs',Math.round(cw*R.fs)+'px');
-  set('--fcell',Math.round(cw*R.fcell)+'px');
-  set('--bh',Math.round(cw*R.bh)+'px');
+  const em=labelEm();
+  const q=Math.max(1,Math.round(window.devicePixelRatio||1));
+  const dims=function(k){
+    const cw=k/q, fs=Math.round(cw*R.fs);
+    const gut=Math.ceil(em*fs+cw*R.gap), tail=Math.round(cw*R.tail), pad=Math.round(cw*R.pad);
+    return {cw:cw,fs:fs,gut:gut,tail:tail,pad:pad,row:gut+cw*N+tail};
+  };
+  let k=Math.floor(avail/(N+R.tail+R.pad*2+em*R.fs+R.gap)*q);
+  k=clamp(k,14*q,36*q);
+  let d=dims(k);
+  while(d.row+d.pad*2>avail && k>14*q){ k--; d=dims(k); }
+  const set=function(key,v){ root.style.setProperty(key,v); };
+  set('--cw',d.cw+'px');
+  set('--gut',d.gut+'px');
+  set('--tail',d.tail+'px');
+  set('--strip',(d.cw*N)+'px');
+  set('--row',d.row+'px');
+  set('--pad',d.pad+'px');
+  set('--fs',d.fs+'px');
+  set('--fcell',Math.round(d.cw*R.fcell)+'px');
+  set('--bh',Math.round(d.cw*R.bh)+'px');
 }
 
 function play(){
@@ -497,8 +529,8 @@ function halt(){
 /* random */
 /* 每個參數一張權重表，重抽照表抽，擾動用 Metropolis 走，
    兩者的長期分布因此必然相同 */
-function buildW(s){
-  const n=s.max-s.min, r=s.rd||{}, w=[];
+function buildW(s,hi){
+  const n=hi-s.min, r=s.rd||{}, w=[];
   for(let i=0;i<=n;i++){
     const t=(i+0.5)/(n+1);
     let x;
@@ -514,25 +546,31 @@ function buildW(s){
   }
   return w;
 }
-SPEC.forEach(function(s){ s._w=buildW(s); });
+SPEC.forEach(function(s){ s._w={}; });
+function wOf(s){
+  const hi=hiOf(s);
+  return s._w[hi]||(s._w[hi]=buildW(s,hi));
+}
 
 function rv(s){
   if(s.ratio) return ratRnd();
-  const w=s._w;
+  const w=wOf(s);
   let tot=0,i;
   for(i=0;i<w.length;i++) tot+=w[i];
   let x=Math.random()*tot;
   for(i=0;i<w.length;i++){ x-=w[i]; if(x<=0) return s.min+i; }
-  return s.max;
+  return hiOf(s);
 }
 
 function nv(s,v){
   if(s.ratio) return ratNudge(v);
-  const sp=s.nsp||Math.max(1,Math.round((s.max-s.min)*0.10));
+  const hi=hiOf(s);
+  v=Math.min(v,hi);
+  const sp=s.nsp||Math.max(1,Math.round((hi-s.min)*0.10));
   const c=v+ri(-sp,sp);
   /* 出界就不動，不能 clamp：clamp 會讓提議不對稱，穩態會偏到端點去 */
-  if(c<s.min||c>s.max||c===v) return v;
-  const w=s._w, a=w[v-s.min], b=w[c-s.min];
+  if(c<s.min||c>hi||c===v) return v;
+  const w=wOf(s), a=w[v-s.min], b=w[c-s.min];
   if(b>=a || Math.random()<b/a) return c;
   return v;
 }
@@ -655,7 +693,7 @@ function drawTrig(){
 function dsp(s,v){
   if(s.enm) return s.enm[v];
   if(s.ratio) return ratLbl(v);
-  if(s.note) return NOTE[((degToSemi(v)%12)+12)%12];
+  if(s.note) return NOTE[degToPc(v)];
   return String(v);
 }
 
@@ -696,7 +734,8 @@ function lanes(){
       function(v){ L.len=clamp(v,1,16); L.idx=0; drawLane(s); },
       { get:function(i){ return L.vals[i]; },
         set:function(i,v0,dy){
-          const x=clamp(Math.round(v0+dy*((s.max-s.min)/70)),s.min,s.max);
+          const hi=hiOf(s);
+          const x=clamp(Math.round(Math.min(v0,hi)+dy*((hi-s.min)/70)),s.min,hi);
           if(x===L.vals[i]) return;
           L.vals[i]=x;
           const c=sp.children[i];
@@ -834,25 +873,52 @@ $("brate").onclick=function(){
   t.rate=r[(r.indexOf(t.rate)+1)%3];
   drawTrig();
 };
-/* 按住往上／往下滑動切換，單純點一下不動作 */
-function bindPick(el,get,set,count){
-  let on=false,y0=0,v0=0;
-  el.addEventListener("pointerdown",function(e){
-    on=true; y0=e.clientY; v0=get();
-    el.setPointerCapture(e.pointerId); e.preventDefault();
+/* 按住往上／往下滑動調整，單純點一下不動作。
+   hit = 可以按住的範圍，key = 接收鍵盤上下鍵的元素
+   px = 手指每移動幾 px 變 1；wrap = 到頭繞回（ROOT、SCALE），否則停在兩端
+   undo = 這次拖曳第一次真的改到值時才存 undo，點一下沒動就不留紀錄 */
+function bindDrag(hit,key,o){
+  let on=false,y0=0,v0=0,dirty=false;
+  function apply(x){
+    const n=o.max-o.min+1;
+    x = o.wrap ? ((x-o.min)%n+n)%n+o.min : clamp(x,o.min,o.max);
+    if(x===o.get()) return;
+    if(!dirty){ dirty=true; if(o.undo) snap(); }
+    o.set(x); o.draw();
+  }
+  hit.addEventListener("pointerdown",function(e){
+    on=true; dirty=false; y0=e.clientY; v0=o.get();
+    hit.classList.add("held");
+    hit.setPointerCapture(e.pointerId); e.preventDefault();
   });
-  el.addEventListener("pointermove",function(e){
-    if(!on) return;
-    const d=Math.round((y0-e.clientY)/11);
-    const x=((v0+d)%count+count)%count;
-    if(x!==get()){ set(x); hdr(); drawLane(SPEC[0]); }
+  hit.addEventListener("pointermove",function(e){
+    if(on) apply(v0+Math.round((y0-e.clientY)/o.px));
   });
-  function up(){ on=false; }
-  el.addEventListener("pointerup",up);
-  el.addEventListener("pointercancel",up);
+  function up(){ on=false; hit.classList.remove("held"); }
+  hit.addEventListener("pointerup",up);
+  hit.addEventListener("pointercancel",up);
+  key.addEventListener("keydown",function(e){
+    const d = e.key==="ArrowUp" ? 1 : e.key==="ArrowDown" ? -1 : 0;
+    if(!d) return;
+    e.preventDefault(); dirty=false; apply(o.get()+d);
+  });
 }
-bindPick($("b-root"), function(){return S.root;}, function(v){S.root=v;}, 12);
-bindPick($("b-scale"),function(){return S.scale;},function(v){S.scale=v;}, SCALES.length);
+function trk(){ return S.tracks[S.sel]; }
+function pitchRedraw(){ hdr(); drawLane(SPEC[0]); }
+bindDrag($("b-root"),$("b-root"),{min:0,max:11,px:11,wrap:true,
+  get:function(){return S.root;},set:function(v){S.root=v;},draw:pitchRedraw});
+bindDrag($("b-scale"),$("b-scale"),{min:0,max:SCALES.length-1,px:11,wrap:true,
+  get:function(){return S.scale;},set:function(v){S.scale=v;},draw:pitchRedraw});
+bindDrag($("f-bpm"),$("v-bpm"),{min:40,max:240,px:3,
+  get:function(){return S.bpm;},set:function(v){S.bpm=v;},draw:hdr});
+bindDrag($("f-swing"),$("v-swing"),{min:50,max:80,px:6,
+  get:function(){return S.swing;},set:function(v){S.swing=v;},draw:hdr});
+bindDrag($("f-pulses"),$("v-pulses"),{min:0,max:16,px:8,undo:true,
+  get:function(){return trk().pulses;},set:function(v){trk().pulses=v;},draw:drawTrig});
+bindDrag($("f-rot"),$("v-rot"),{min:0,max:15,px:8,undo:true,
+  get:function(){return trk().rot;},set:function(v){trk().rot=v;},draw:drawTrig});
+bindDrag($("f-oct"),$("v-oct"),{min:0,max:7,px:12,undo:true,
+  get:function(){return trk().oct;},set:function(v){trk().oct=v;},draw:drawTrig});
 $("dtrk").onclick=function(){
   snap();
   const t=S.tracks[S.sel];
@@ -874,27 +940,9 @@ $("dtrk").onclick=function(){
   t.reroll=nextReroll(); drawTrig(); lanes();
 };
 
-document.querySelectorAll("[data-n]").forEach(function(b){
-  b.onclick=function(){
-    const k=b.dataset.n,d=+b.dataset.d;
-    if(k==="bpm")   S.bpm=clamp(S.bpm+d,40,240);
-    if(k==="swing") S.swing=clamp(S.swing+d,50,80);
-    hdr();
-  };
-});
-document.querySelectorAll("[data-t]").forEach(function(b){
-  b.onclick=function(){
-    snap();
-    const t=S.tracks[S.sel],k=b.dataset.t,d=+b.dataset.d;
-    if(k==="pulses") t.pulses=clamp(t.pulses+d,0,16);
-    if(k==="rot")    t.rot=clamp(t.rot+d,0,15);
-    if(k==="oct")    t.oct=clamp(t.oct+d,1,6);
-    drawTrig();
-  };
-});
-
-fit(); $("b-undo").classList.add("dead");
-hdr(); tabs(); ruler(); drawLen(); drawTrig(); lanes(); frame();
+$("b-undo").classList.add("dead");
+hdr(); tabs(); ruler(); drawLen(); drawTrig(); lanes(); fit(); frame();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit);
 let rzt=null;
 window.addEventListener("resize",function(){
   clearTimeout(rzt);
