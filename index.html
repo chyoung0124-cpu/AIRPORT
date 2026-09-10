@@ -19,7 +19,7 @@
   --dim:#6e6e6e;
   /* 以下九項由 fit() 依視窗寬度算出，比例固定 */
   --cw:19px; --gut:41px; --tail:19px; --strip:304px; --row:364px;
-  --pad:6px; --fs:10px; --fcell:9px; --bh:15px; --dice:14px;
+  --pad:6px; --fs:10px; --fcell:9px; --bh:15px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -36,7 +36,7 @@ body{
 .head .note{color:var(--dim);letter-spacing:.14em}
 
 .mod{background:var(--panel);padding:var(--pad);margin-bottom:6px}
-.hd{display:grid;grid-template-columns:var(--gut) 1fr;align-items:center;margin-bottom:5px}
+.hd{display:grid;grid-template-columns:var(--gut) 1fr var(--tail);align-items:center;margin-bottom:5px}
 .hd .cap{letter-spacing:.14em;color:var(--dim)}
 .ctl{display:flex;align-items:center;gap:calc(var(--pad)*0.9);flex-wrap:wrap;row-gap:4px}
 .fld{display:flex;align-items:center;gap:1px;flex:none}
@@ -49,7 +49,7 @@ button:active{background:var(--amber);color:#140d00;border-color:var(--amber)}
 button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 .stp{width:calc(var(--bh) - 1px);padding:0;text-align:center}
 .n{min-width:calc(var(--cw)*1.2);text-align:center;display:inline-block;color:var(--amber);
-   font-family:'Manolo Mono',monospace;font-weight:400}
+   font-family:'Manolo Mono',monospace;font-weight:400;padding-left:.2em}
 .n.warn{color:#ff5a34}
 .play{width:calc(var(--cw)*2.1);letter-spacing:.1em;padding:0}
 .play.on{background:var(--amber);border-color:var(--amber);color:#140d00}
@@ -69,6 +69,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       display:flex;align-items:center;justify-content:center;
       font-family:'Manolo Mono',monospace;font-weight:400;
       font-size:var(--fcell);line-height:var(--fcell);color:var(--amber);overflow:hidden;
+      padding-left:.2em;
       box-shadow:inset -1px 0 0 var(--panel),inset 0 -1px 0 var(--panel)}
 .cell.off{background:none;box-shadow:none}
 .cell.off::after{content:"";width:2px;height:2px;background:#242424}
@@ -82,15 +83,61 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
             height:calc(var(--cw)*0.4)}
 .ruler svg{display:block;fill:#fff;shape-rendering:crispEdges}
 
-.dice{width:var(--dice);height:var(--dice);padding:0;border:none;background:none;
-      color:var(--dim);line-height:0;cursor:pointer;justify-self:end}
-.dice svg{width:var(--dice);height:var(--dice);display:block}
+.tail{display:flex;align-items:center;justify-content:flex-end}
+.tbtn{width:var(--cw);height:var(--cw);flex:none;padding:0;border-radius:0;
+      display:flex;align-items:center;justify-content:center;line-height:1}
+.mode{background:none;border:none;padding:0;color:var(--dim);cursor:pointer}
+.mode svg{width:calc(var(--cw)*0.78);height:calc(var(--cw)*0.78);display:block}
+.mode:hover{color:var(--amber);background:none}
+.mode:active{color:#fff;background:none}
+.mode.on{color:var(--amber)}
+.snap{background:none;border:none;padding:0;cursor:pointer;color:var(--dim);
+      width:var(--tail);height:var(--bh);display:flex;align-items:center;justify-content:flex-end}
+.snap svg{width:var(--cw);height:var(--cw);display:block}
+.snap .fl{display:none}
+.snap.has{color:var(--amber)}
+.snap:hover{color:#fff;background:none}
+.snap:active{background:none}
+.snap:hover .ol{display:none}
+.snap:hover .fl{display:inline}
+.solo.on{background:#4fb0ff;color:#00121f;border-color:#4fb0ff}
+.tap{cursor:pointer;touch-action:auto}
+.tog{}
+.tap.dead{color:#3a3a3a}
+.icn{width:var(--bh);height:var(--bh);padding:0;background:none;border:none;
+     color:var(--amber);display:flex;align-items:center;justify-content:center}
+.icn svg{width:calc(var(--bh)*0.86);height:calc(var(--bh)*0.86);display:block}
+.icn:hover{color:#fff;background:none}
+.icn:active{background:none}
+.dice{border:none;background:none;color:var(--dim);cursor:pointer}
+.dice svg{width:calc(var(--cw)*0.78);height:calc(var(--cw)*0.78);display:block}
 .dice:hover{color:var(--amber);background:none}
-.dice:active{color:#fff;background:none}
-.dice:focus-visible{outline:1px solid var(--amber);outline-offset:2px}
+.dice:active{color:#fff}
+.dice:focus-visible{outline:1px solid var(--amber);outline-offset:-1px}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="camO" viewBox="0 0 24 24">
+<rect x="1" y="6" width="22" height="14" fill="none" stroke="currentColor" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+<rect x="8" y="3.2" width="5" height="2.8" fill="currentColor"/>
+<rect x="16.5" y="3.4" width="3" height="2.6" fill="currentColor"/>
+<circle cx="12" cy="13" r="3.6" fill="currentColor"/></symbol>
+<symbol id="camF" viewBox="0 0 24 24">
+<rect x="1" y="6" width="22" height="14" fill="currentColor"/>
+<rect x="8" y="3.2" width="5" height="2.8" fill="currentColor"/>
+<rect x="16.5" y="3.4" width="3" height="2.6" fill="currentColor"/>
+<circle cx="12" cy="13" r="3.6" fill="var(--panel)"/></symbol>
+<symbol id="filO" viewBox="0 0 24 24">
+<path d="M14.4 7 H1.5 V12 H6.5 V17 H14.4 Z" fill="currentColor"/>
+<rect x="14.4" y="3.6" width="7.8" height="16.8" fill="none" stroke="currentColor" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+<rect x="16.6" y="1.2" width="3.4" height="2.4" fill="currentColor"/></symbol>
+<symbol id="filF" viewBox="0 0 24 24">
+<path d="M14.4 7 H1.5 V12 H6.5 V17 H14.4 Z" fill="currentColor"/>
+<rect x="14.4" y="3.6" width="7.8" height="16.8" fill="currentColor"/>
+<rect x="16.6" y="1.2" width="3.4" height="2.4" fill="currentColor"/></symbol>
+<symbol id="undo" viewBox="0 0 24 24">
+<path d="M6 9 H14 a5 5 0 0 1 0 10 H9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/>
+<path d="M10 3.5 L4.5 9 L10 14.5 Z" fill="currentColor"/></symbol>
 <symbol id="d3" viewBox="0 0 24 24">
 <rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
 <circle cx="7" cy="7" r="1.9" fill="currentColor"/><circle cx="12" cy="12" r="1.9" fill="currentColor"/><circle cx="17" cy="17" r="1.9" fill="currentColor"/></symbol>
@@ -115,7 +162,9 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       <span class="fld"><label>SWG</label><button class="stp" data-n="swing" data-d="-1">−</button><span class="n" id="v-swing"></span><button class="stp" data-n="swing" data-d="1">+</button></span>
       <button class="pick" id="b-root" title="ROOT"></button>
       <button class="pick" id="b-scale" title="SCALE"></button>
+      <button class="icn tap" id="b-undo" title="UNDO"><svg><use href="#undo"/></svg></button>
     </div>
+    <button class="snap" id="bsnap"><svg viewBox="0 0 24 24"><use class="ol" href="#camO"/><use class="fl" href="#camF"/></svg></button>
   </div>
   <div class="row">
     <span></span>
@@ -125,7 +174,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
   <div class="row">
     <span class="gut">LEN</span>
     <div class="strip" id="splen"></div>
-    <span></span>
+    <div class="tail"><button class="dice tbtn" id="dall" title="ALL"></button><button class="mode tbtn tap" id="bfree" title="FREE：鬆開 master 對各軌 trig 的相位約束"><svg viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" vector-effect="non-scaling-stroke"/><text text-anchor="middle" dominant-baseline="central" fill="currentColor" font-family="Manolo Mono,monospace"></text></svg></button></div>
   </div>
 </div>
 
@@ -138,12 +187,14 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       <span class="fld"><label>ROT</label><button class="stp" data-t="rot" data-d="-1">−</button><span class="n" id="v-rot"></span><button class="stp" data-t="rot" data-d="1">+</button></span>
       <span class="fld"><label>OCT</label><button class="stp" data-t="oct" data-d="-1">−</button><span class="n" id="v-oct"></span><button class="stp" data-t="oct" data-d="1">+</button></span>
       <button class="mute" id="mute">MUTE</button>
+      <button class="solo" id="solo">SOLO</button>
     </div>
+    <span></span>
   </div>
   <div class="row">
     <span class="gut">STEP</span>
     <div class="strip" id="sptrig"></div>
-    <button class="dice" id="dtrk"></button>
+    <div class="tail"><button class="dice tbtn" id="dtrk"></button><button class="mode tbtn tap" id="brate" title="這條軌的步進速率"><svg viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" vector-effect="non-scaling-stroke"/><text text-anchor="middle" dominant-baseline="central" fill="currentColor" font-family="Manolo Mono,monospace"></text></svg></button></div>
   </div>
 </div>
 
@@ -222,9 +273,9 @@ function nextReroll(){ return Math.random()<REROLL_P; }
 
 function makeTrack(i){
   const e=[[16,4,0],[16,5,2],[12,3,0],[7,3,1]][i];
-  const t={mute:false,oct:[3,4,2,4][i],steps:e[0],pulses:e[1],rot:e[2],reroll:nextReroll(),lanes:{}};
+  const t={mute:false,solo:false,rate:16,oct:[3,4,2,4][i],steps:e[0],pulses:e[1],rot:e[2],reroll:nextReroll(),lanes:{}};
   SPEC.forEach(function(s){
-    t.lanes[s.id]={len:s.len,idx:0,vals:new Array(N).fill(s.def),reroll:nextReroll()};
+    t.lanes[s.id]={len:s.len,idx:0,mode:"T",vals:new Array(N).fill(s.def),reroll:nextReroll()};
   });
   const ps=[[0,0,4,2],[0,2,4,6,3],[-7,0,-7],[7,5,4,2]];
   ps[i].forEach(function(v,k){ t.lanes.pitch.vals[k]=v; });
@@ -237,7 +288,7 @@ function makeTrack(i){
   return t;
 }
 
-const S={bpm:112,swing:50,mlen:16,root:0,scale:1,playing:false,step:0,sel:0,
+const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shot:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
          tracks:[0,1,2,3].map(makeTrack)};
 
 function degToSemi(d){
@@ -246,6 +297,14 @@ function degToSemi(d){
   return sc[i]+12*oct+S.root;
 }
 function effP(t){ return Math.min(t.pulses,t.steps); }
+/* 一個 master step 內，這條軌會走到的 euclid 位置與時間偏移（0 或 0.5 格） */
+function slots(t,st,g){
+  const b=S.free?g:st, o=[];
+  if(t.rate===32){ o.push([b*2,0]); o.push([b*2+1,0.5]); }
+  else if(t.rate===16){ o.push([b,0]); }
+  else if(b%2===0){ o.push([b/2,0]); }
+  return o;
+}
 function hit(step,t){
   const P=effP(t);
   if(P<=0) return false;
@@ -365,21 +424,36 @@ const LOOK=0.10,TICK=25,vq=[];
 function sdur(){ return 60/S.bpm/4; }
 function sched(){
   while(nextT<ac.currentTime+LOOK){
-    const st=S.step;
-    const t0=nextT+((st%2===1)?sdur()*(S.swing-50)/50:0);
+    const st=S.step, cy=S.cycle, g=S.g, d=sdur();
+    const sw=function(i){ return (i%2===1)? d*(S.swing-50)/50 : 0; };
+    const t0=nextT+sw(g), t1=nextT+d+sw(g+1), tm=(t0+t1)/2;
+    let solo=false;
+    S.tracks.forEach(function(t){ if(t.solo) solo=true; });
     S.tracks.forEach(function(t,ti){
-      if(!hit(st,t)) return;
-      const p={},sn={};
-      SPEC.forEach(function(s){
-        const L=t.lanes[s.id];
-        p[s.id]=L.vals[L.idx%L.len]; sn[s.id]=L.idx%L.len;
+      const on = !t.mute && (!solo || t.solo);
+      slots(t,st,g).forEach(function(sl){
+        if(!hit(sl[0],t)) return;
+        const at = sl[1] ? tm : t0;
+        const p={},sn={};
+        SPEC.forEach(function(s){
+          const L=t.lanes[s.id];
+          /* T：每顆音前進一格。C：一個 master cycle 前進一格（由圈數推導） */
+          const i=(L.mode==="C") ? (cy%L.len) : (L.idx%L.len);
+          p[s.id]=L.vals[i]; sn[s.id]=i;
+        });
+        if(on&&ac){ try{ note(at,p,d*0.9*16/t.rate,t.oct); }catch(err){} }
+        SPEC.forEach(function(s){
+          const L=t.lanes[s.id];
+          if(L.mode!=="C") L.idx=(L.idx+1)%L.len;
+        });
+        vq.push({t:at,tr:ti,sn:sn});
       });
-      if(!t.mute&&ac){ try{ note(t0,p,sdur()*0.9,t.oct); }catch(err){} }
-      SPEC.forEach(function(s){ const L=t.lanes[s.id]; L.idx=(L.idx+1)%L.len; });
-      vq.push({t:t0,tr:ti,sn:sn});
     });
-    nextT+=sdur();
+    vq.sort(function(a,b){ return a.t-b.t; });
+    nextT+=d;
+    S.g++;
     S.step=(S.step+1)%S.mlen;
+    if(S.step===0) S.cycle++;
   }
   timer=setTimeout(sched,TICK);
 }
@@ -387,7 +461,7 @@ function sched(){
 const $=function(i){ return document.getElementById(i); };
 
 /* 依視窗寬度算出整數格寬，其餘尺寸按固定比例推導 */
-const R={gut:2.15,tail:1.0,pad:0.33,fs:0.50,fcell:0.46,bh:0.76,dice:0.68};
+const R={gut:2.15,tail:2.4,pad:0.33,fs:0.50,fcell:0.46,bh:0.76};
 function fit(){
   const root=document.documentElement;
   const bs=getComputedStyle(document.body);
@@ -406,11 +480,10 @@ function fit(){
   set('--fs',Math.round(cw*R.fs)+'px');
   set('--fcell',Math.round(cw*R.fcell)+'px');
   set('--bh',Math.round(cw*R.bh)+'px');
-  set('--dice',Math.round(cw*R.dice)+'px');
 }
 
 function play(){
-  audio(); S.playing=true; S.step=0;
+  audio(); S.playing=true; S.step=0; S.g=0; S.cycle=0;
   nextT=ac.currentTime+0.3; sched();
   const b=$("play"); b.classList.add("on"); b.textContent="STOP";
 }
@@ -466,6 +539,23 @@ function nv(s,v){
 
 /* ---- ui ---- */
 
+const MODESVG='<svg viewBox="0 0 24 24">'
+  +'<rect x="1" y="1" width="22" height="22" fill="none" stroke="currentColor" '
+  +'stroke-width="1.4" vector-effect="non-scaling-stroke"/>'
+  +'<text text-anchor="middle" dominant-baseline="central" fill="currentColor" '
+  +'font-family="Manolo Mono,monospace"></text></svg>';
+
+/* Manolo Mono 的字左邊距 0、右邊距 0.2em，置中要往右補 0.1em */
+function setMode(btn,txt){
+  const t=btn.querySelector("text");
+  if(!t) return;
+  const fs = txt.length>1 ? 13 : 15;
+  t.setAttribute("font-size",fs);
+  t.setAttribute("x", 12 + fs*0.1);
+  t.setAttribute("y", 12);
+  t.textContent=txt;
+}
+
 function diceSvg(b,face){ b.innerHTML='<svg><use href="#d'+face+'"/></svg>'; }
 
 function mkcell(cls,txt){
@@ -496,6 +586,7 @@ function bindStrip(sp, getLen, setLen, val){
     return clamp(Math.floor((x-r.left)/(r.width/N)),0,N-1);
   }
   sp.addEventListener("pointerdown",function(e){
+    snap();
     si=idxAt(e.clientX); x0=e.clientX; y0=e.clientY;
     const len=getLen();
     if(!val || si>=len){ mode="size"; setLen(si+1); }
@@ -537,19 +628,26 @@ function ruler(){
 function drawLen(){
   const cs=cells($("splen"));
   for(let i=0;i<N;i++) setCell(cs[i], i>=S.mlen, false, false);
+  diceSvg($("dall"), S.greroll?6:3);
+  $("dall").title = S.greroll ? "REROLL ALL TRACKS" : "NUDGE ALL TRACKS";
 }
 
 function drawTrig(){
   const t=S.tracks[S.sel], cs=cells($("sptrig"));
+  const reach = S.free ? N : Math.round(S.mlen*t.rate/16);
   for(let i=0;i<N;i++){
     const dead=i>=t.steps;
-    setCell(cs[i], dead, !dead&&hit(i,t), !dead&&i>=S.mlen);
+    setCell(cs[i], dead, !dead&&hit(i,t), !dead&&i>=reach);
   }
+  setMode($("brate"),String(t.rate));
+  setMode($("bfree"),"F");
+  $("bfree").classList.toggle("on",S.free);
   const pv=$("v-pulses");
   pv.textContent=effP(t); pv.classList.toggle("warn",t.pulses>t.steps);
   $("v-rot").textContent=t.rot;
   $("v-oct").textContent=t.oct;
   $("mute").classList.toggle("on",t.mute);
+  $("solo").classList.toggle("on",t.solo);
   diceSvg($("dtrk"), t.reroll?6:3);
   $("dtrk").title=t.reroll?"REROLL TRACK":"NUDGE TRACK";
 }
@@ -570,6 +668,8 @@ function drawLane(s){
                               i<L.len?dsp(s,L.vals[i]):undefined);
   const d=document.querySelector('#lanes .dice[data-id="'+s.id+'"]');
   if(d){ diceSvg(d,L.reroll?6:3); d.title=L.reroll?"REROLL LEN + VALUES":"NUDGE VALUES"; }
+  const m=document.querySelector('#lanes .mode[data-id="'+s.id+'"]');
+  if(m) setMode(m,L.mode);
 }
 
 function lanes(){
@@ -579,13 +679,19 @@ function lanes(){
     const row=document.createElement("div"); row.className="row";
     const g=document.createElement("span"); g.className="gut"; g.textContent=s.label;
     const sp=document.createElement("div"); sp.className="strip"; sp.dataset.id=s.id;
-    const d=document.createElement("button"); d.className="dice"; d.dataset.id=s.id;
+    const d=document.createElement("button"); d.className="dice tbtn"; d.dataset.id=s.id;
     d.onclick=function(){
+      snap();
       if(L.reroll){ L.len=ri(1,8); L.idx=0; for(let i=0;i<L.len;i++) L.vals[i]=rv(s); }
       else for(let i=0;i<L.len;i++) L.vals[i]=nv(s,L.vals[i]);
       L.reroll=nextReroll(); drawLane(s);
     };
-    row.append(g,sp,d); box.appendChild(row);
+    const m=document.createElement("button"); m.className="mode tbtn"; m.dataset.id=s.id;
+    m.title="T = 每顆音前進一格 / C = 每圈前進一格";
+    m.innerHTML=MODESVG;
+    m.onclick=function(){ snap(); L.mode=(L.mode==="C"?"T":"C"); L.idx=0; drawLane(s); };
+    const tl=document.createElement("div"); tl.className="tail"; tl.append(d,m);
+    row.append(g,sp,tl); box.appendChild(row);
     bindStrip(sp, function(){ return L.len; },
       function(v){ L.len=clamp(v,1,16); L.idx=0; drawLane(s); },
       { get:function(i){ return L.vals[i]; },
@@ -609,6 +715,53 @@ function tabs(){
     b.onclick=function(){ S.sel=i; tabs(); drawTrig(); lanes(); };
     box.appendChild(b);
   });
+}
+
+/* SNAP：相機拍下當前狀態，膠捲把它叫回來。
+   還原內容但不動指標——參數軌繼續跑在原本的相位上，換入是漸進的，不會有斷點 */
+function drawSnap(){
+  const b=$("bsnap");
+  b.classList.toggle("has",!!S.shot);
+  b.querySelector(".ol").setAttribute("href", S.shot?"#filO":"#camO");
+  b.querySelector(".fl").setAttribute("href", S.shot?"#filF":"#camF");
+  b.title = S.shot ? "RECALL SNAPSHOT" : "TAKE SNAPSHOT";
+}
+function takeShot(){
+  S.shot=JSON.stringify({t:S.tracks,m:S.mlen,f:S.free});
+  drawSnap();
+}
+function useShot(){
+  if(!S.shot) return;
+  snap();
+  const d=JSON.parse(S.shot);
+  S.mlen=d.m; S.free=d.f;
+  d.t.forEach(function(src,i){
+    const t=S.tracks[i];
+    t.mute=src.mute; t.solo=src.solo; t.rate=src.rate; t.oct=src.oct;
+    t.steps=src.steps; t.pulses=src.pulses; t.rot=src.rot;
+    SPEC.forEach(function(sp){
+      const L=t.lanes[sp.id], q=src.lanes[sp.id];
+      L.len=q.len; L.mode=q.mode; L.vals=q.vals.slice();
+      L.idx=L.idx%L.len;
+    });
+  });
+  S.shot=null;
+  drawSnap(); drawLen(); drawTrig(); lanes();
+}
+
+/* UNDO：任何會改動內容的操作前先存一份完整狀態；拖曳只在按下時存一次 */
+const UNDO=[];
+function snap(){
+  UNDO.push(JSON.stringify({t:S.tracks,m:S.mlen,f:S.free}));
+  if(UNDO.length>40) UNDO.shift();
+  $("b-undo").classList.remove("dead");
+}
+function undo(){
+  if(!UNDO.length) return;
+  const d=JSON.parse(UNDO.pop());
+  S.tracks=d.t; S.mlen=d.m; S.free=d.f;
+  if(!UNDO.length) $("b-undo").classList.add("dead"); drawSnap();
+  drawLen(); drawTrig(); lanes(); hdr();
 }
 
 function hdr(){
@@ -636,8 +789,11 @@ function frame(){
     Array.prototype.forEach.call($("splen").children,function(c,i){
       c.classList.toggle("now",i===S.step);
     });
+    const b=S.free?S.g:S.step;
+    let pos = t.rate===32 ? b*2 : (t.rate===16 ? b : Math.floor(b/2));
+    pos=((pos%t.steps)+t.steps)%t.steps;
     Array.prototype.forEach.call($("sptrig").children,function(c,i){
-      c.classList.toggle("now",i===S.step%t.steps);
+      c.classList.toggle("now",i===pos);
     });
   }
   requestAnimationFrame(frame);
@@ -645,6 +801,39 @@ function frame(){
 
 $("play").onclick=function(){ S.playing?halt():play(); };
 $("mute").onclick=function(){ const t=S.tracks[S.sel]; t.mute=!t.mute; drawTrig(); };
+$("solo").onclick=function(){ const t=S.tracks[S.sel]; t.solo=!t.solo; drawTrig(); };
+$("b-undo").onclick=undo;
+$("bsnap").onclick=function(){ S.shot?useShot():takeShot(); };
+$("bfree").onclick=function(){ snap(); S.free=!S.free; drawTrig(); };
+$("dall").onclick=function(){
+  snap();
+  S.tracks.forEach(function(t){
+    if(S.greroll){
+      t.steps=ri(3,16); t.pulses=ri(1,t.steps); t.rot=ri(0,t.steps-1);
+      SPEC.forEach(function(s){
+        const L=t.lanes[s.id];
+        L.len=ri(1,8); L.idx=0;
+        for(let i=0;i<L.len;i++) L.vals[i]=rv(s);
+        L.reroll=nextReroll();
+      });
+    } else {
+      t.rot=((t.rot+pick([-1,1]))%t.steps+t.steps)%t.steps;
+      SPEC.forEach(function(s){
+        const L=t.lanes[s.id];
+        for(let i=0;i<L.len;i++) L.vals[i]=nv(s,L.vals[i]);
+      });
+    }
+    t.reroll=nextReroll();
+  });
+  S.greroll=nextReroll();
+  drawLen(); drawTrig(); lanes();
+};
+$("brate").onclick=function(){
+  snap();
+  const t=S.tracks[S.sel], r=[8,16,32];
+  t.rate=r[(r.indexOf(t.rate)+1)%3];
+  drawTrig();
+};
 /* 按住往上／往下滑動切換，單純點一下不動作 */
 function bindPick(el,get,set,count){
   let on=false,y0=0,v0=0;
@@ -665,6 +854,7 @@ function bindPick(el,get,set,count){
 bindPick($("b-root"), function(){return S.root;}, function(v){S.root=v;}, 12);
 bindPick($("b-scale"),function(){return S.scale;},function(v){S.scale=v;}, SCALES.length);
 $("dtrk").onclick=function(){
+  snap();
   const t=S.tracks[S.sel];
   if(t.reroll){
     t.steps=ri(3,16); t.pulses=ri(1,t.steps); t.rot=ri(0,t.steps-1);
@@ -694,6 +884,7 @@ document.querySelectorAll("[data-n]").forEach(function(b){
 });
 document.querySelectorAll("[data-t]").forEach(function(b){
   b.onclick=function(){
+    snap();
     const t=S.tracks[S.sel],k=b.dataset.t,d=+b.dataset.d;
     if(k==="pulses") t.pulses=clamp(t.pulses+d,0,16);
     if(k==="rot")    t.rot=clamp(t.rot+d,0,15);
@@ -702,12 +893,13 @@ document.querySelectorAll("[data-t]").forEach(function(b){
   };
 });
 
-fit(); hdr(); tabs(); ruler(); drawLen(); drawTrig(); lanes(); frame();
+fit(); $("b-undo").classList.add("dead");
+hdr(); tabs(); ruler(); drawLen(); drawTrig(); lanes(); frame();
 let rzt=null;
 window.addEventListener("resize",function(){
   clearTimeout(rzt);
   rzt=setTimeout(function(){
-    ['--cw','--gut','--tail','--strip','--row','--pad','--fs','--fcell','--bh','--dice']
+    ['--cw','--gut','--tail','--strip','--row','--pad','--fs','--fcell','--bh']
       .forEach(function(k){ document.documentElement.style.removeProperty(k); });
     fit();
   },120);
