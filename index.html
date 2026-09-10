@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ORBITANT</title>
+<title>JETLAG</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap" rel="stylesheet">
@@ -53,6 +53,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 .n.warn{color:#ff5a34}
 .play{width:calc(var(--cw)*2.1);letter-spacing:.1em;padding:0}
 .play.on{background:var(--amber);border-color:var(--amber);color:#140d00}
+.pick.tap{cursor:pointer;touch-action:auto}
 .pick{min-width:calc(var(--cw)*1.5);text-align:center;color:var(--amber);
       padding:0 3px;cursor:ns-resize;touch-action:none}
 .tabs{display:flex;flex:none}
@@ -103,7 +104,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 
 <div class="rack">
 <div class="head">
-  <div class="big">ORBITANT</div>
+  <div class="big">JETLAG</div>
 </div>
 
 <div class="mod">
@@ -112,9 +113,10 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
     <div class="ctl">
       <button class="play" id="play">PLAY</button>
       <span class="fld"><label>BPM</label><button class="stp" data-n="bpm" data-d="-1">−</button><span class="n" id="v-bpm"></span><button class="stp" data-n="bpm" data-d="1">+</button></span>
-      <span class="fld"><label>SWG</label><button class="stp" data-n="swing" data-d="-2">−</button><span class="n" id="v-swing"></span><button class="stp" data-n="swing" data-d="2">+</button></span>
+      <span class="fld"><label>SWG</label><button class="stp" data-n="swing" data-d="-1">−</button><span class="n" id="v-swing"></span><button class="stp" data-n="swing" data-d="1">+</button></span>
       <button class="pick" id="b-root" title="ROOT"></button>
       <button class="pick" id="b-scale" title="SCALE"></button>
+      <button class="pick tap" id="b-rat" title="M RAT ENCODING"></button>
     </div>
   </div>
   <div class="row">
@@ -154,9 +156,51 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 "use strict";
 
 const N=16, REROLL_P=1/7;
-/* M RAT：兩位數 = 比值 ×10，05-80 → 0.5-8.0。10=1.0、15=1.5、80=8.0 */
-function ratOf(v){ return v/10; }
-function ratLbl(v){ return v<10 ? "0"+v : String(v); }
+/* M RAT 有兩種編碼，可在標題列切換；切換時會把現有的值換算過去 */
+const RATMODE=[
+  { n:"x10", min:5, max:80, nsp:3,
+    of:function(v){ return v/10; },
+    /* 擾動走「附近但約分後分母小」的鄰居，權重 1/q。FM 的聽感距離由最簡分母 q
+       決定而不是數線距離：2.0 的鄰居 2.1 是 q=10，比跳到 1.5(q=2) 髒得多。
+       權重用 1/q 而不是 1/q^2，這樣反覆擾動的穩態分布會等於重抽的母體，
+       不會把整數比變成吸子 */
+    nudge:function(v){
+      const cand=[],w=[];
+      for(let x=Math.max(5,v-5);x<=Math.min(80,v+5);x++){
+        if(x===v) continue;
+        let a=x,b=10; while(b){ const t=a%b; a=b; b=t; }
+        const q=10/a;
+        cand.push(x); w.push(1/q);
+      }
+      let tot=0,i;
+      for(i=0;i<w.length;i++) tot+=w[i];
+      let r=Math.random()*tot;
+      for(i=0;i<cand.length;i++){ r-=w[i]; if(r<=0) return cand[i]; }
+      return cand[cand.length-1];
+    },
+    lbl:function(v){ return v<10?"0"+v:String(v); },
+    enc:function(r){ return clamp(Math.round(r*10),5,80); },
+    rnd:function(){
+      for(let k=0;k<32;k++){ const v=Math.round(ri(1,8)/ri(1,8)*10);
+        if(v>=5&&v<=80) return v; }
+      return 10;
+    } },
+  { n:"n/d", min:0, max:63, nsp:6,
+    of:function(v){ return ((v>>3)+1)/((v&7)+1); },
+    lbl:function(v){ return String((v>>3)+1)+String((v&7)+1); },
+    enc:function(r){
+      let best=0,bd=1e9;
+      for(let v=0;v<64;v++){
+        const d=Math.abs(((v>>3)+1)/((v&7)+1)-r);
+        if(d<bd){ bd=d; best=v; }
+      }
+      return best;
+    },
+    rnd:function(){ return ri(0,63); } }
+];
+let RM=0;
+function ratOf(v){ return RATMODE[RM].of(v); }
+function ratLbl(v){ return RATMODE[RM].lbl(v); }
 
 const NOTE=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const SCALES=[
@@ -170,19 +214,22 @@ const SCALES=[
   {n:"CHR", s:[0,1,2,3,4,5,6,7,8,9,10,11]}
 ];
 
-/* 值一律兩個字元以內，手機格子才放得下 */
+/* 值一律兩個字元以內，手機格子才放得下
+   rd = 重抽與擾動共用的分布形狀：
+        p<1 偏高、p>1 偏低、tri 中間高、w 離散權重、z 在最小值多加一塊機率 */
 const SPEC=[
-  {id:"pitch", label:"PITCH", min:-9, max:9,  def:0,  len:4, note:true},
-  {id:"pan",   label:"PAN",   min:0,  max:2,  def:1,  len:1, enm:["L","C","R"]},
-  {id:"lvl",   label:"LVL",   min:0,  max:99, def:80, len:3},
-  {id:"atk",   label:"ATK",   min:0,  max:99, def:2,  len:1},
-  {id:"dec",   label:"DEC",   min:0,  max:99, def:45, len:2},
-  {id:"end",   label:"END",   min:0,  max:99, def:0,  len:1},
-  {id:"midx",  label:"M IDX", min:0,  max:99, def:40, len:5},
+  {id:"pitch", label:"PITCH", min:-9, max:9,  def:0,  len:4, note:true, rd:{tri:1}},
+  {id:"pan",   label:"PAN",   min:0,  max:2,  def:1,  len:1, enm:["L","C","R"], rd:{w:[1,2,1]}},
+  {id:"lvl",   label:"LVL",   min:0,  max:99, def:80, len:3, rd:{p:0.45}},
+  {id:"atk",   label:"ATK",   min:0,  max:99, def:2,  len:1, rd:{p:3.5,z:0.35}},
+  {id:"dec",   label:"DEC",   min:0,  max:99, def:45, len:2, rd:{tri:1}},
+  {id:"end",   label:"END",   min:0,  max:99, def:0,  len:1, rd:{p:2.5,z:0.40}},
+  {id:"midx",  label:"M IDX", min:0,  max:99, def:40, len:5, rd:{p:1.5}},
   {id:"mrat",  label:"M RAT", min:5,  max:80, def:20, len:1, ratio:true, nsp:3},
-  {id:"matk",  label:"M ATK", min:0,  max:99, def:0,  len:1},
-  {id:"mdec",  label:"M DEC", min:0,  max:99, def:35, len:1},
-  {id:"mend",  label:"M END", min:0,  max:99, def:10, len:1}
+  {id:"mfdk",  label:"M FDK", min:0,  max:99, def:0,  len:1, rd:{p:1.3,z:0.30}},
+  {id:"matk",  label:"M ATK", min:0,  max:99, def:0,  len:1, rd:{p:3.5,z:0.45}},
+  {id:"mdec",  label:"M DEC", min:0,  max:99, def:35, len:1, rd:{tri:1}},
+  {id:"mend",  label:"M END", min:0,  max:99, def:10, len:1, rd:{p:2.5,z:0.40}}
 ];
 
 function ri(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
@@ -207,7 +254,7 @@ function makeTrack(i){
   return t;
 }
 
-const S={bpm:112,swing:0,mlen:16,root:0,scale:1,playing:false,step:0,sel:0,
+const S={bpm:112,swing:50,mlen:16,root:0,scale:1,playing:false,step:0,sel:0,
          tracks:[0,1,2,3].map(makeTrack)};
 
 function degToSemi(d){
@@ -224,40 +271,109 @@ function hit(step,t){
   return ((i*P)%t.steps)<P;
 }
 
-/* audio */
-let ac=null,bus=null;
+/* ---- audio: AudioWorklet，逐 sample 的 2-op FM，調變器帶真回授 ---- */
+
+const WSRC = `
+const TAU=6.283185307179586;
+class JL extends AudioWorkletProcessor{
+  constructor(){
+    super();
+    this.q=[]; this.v=[];
+    for(let i=0;i<16;i++) this.v.push({on:false,start:0});
+    this.port.onmessage=(e)=>{
+      const d=e.data;
+      if(d.stop){ this.q.length=0; for(const v of this.v) v.on=false; return; }
+      this.q.push(d);
+      this.q.sort((a,b)=>a.t-b.t);
+    };
+  }
+  alloc(){
+    let best=this.v[0], old=Infinity;
+    for(const v of this.v){
+      if(!v.on) return v;
+      if(v.start<old){ old=v.start; best=v; }
+    }
+    return best;
+  }
+  process(inputs,outputs){
+    const o=outputs[0], L=o[0], R=o[1], n=L.length, base=currentFrame;
+    const rCo=1-Math.exp(-1/(0.006*sampleRate));
+    for(let i=0;i<n;i++){
+      const t=base+i;
+      while(this.q.length && this.q[0].t<=t){
+        const d=this.q.shift(), v=this.alloc();
+        v.on=true; v.start=t;
+        v.pc=0; v.pm=0; v.m1=0; v.m2=0;
+        v.dc=d.fc/sampleRate; v.dm=d.fm/sampleRate;
+        v.fb=d.fb; v.idx=d.idx; v.lvl=d.lvl; v.pl=d.pl; v.pr=d.pr;
+        v.off=t+d.gate;
+        v.aS=0; v.aE=0; v.aI=1/Math.max(1,d.aA); v.aL=d.aL;
+        v.aC=1-Math.exp(-1/Math.max(1,d.aD));
+        v.iS=0; v.iE=0; v.iI=1/Math.max(1,d.iA); v.iL=d.iL;
+        v.iC=1-Math.exp(-1/Math.max(1,d.iD));
+      }
+      let l=0,r=0;
+      for(const v of this.v){
+        if(!v.on) continue;
+        if(v.aS===0){ v.aE+=v.aI; if(v.aE>=1){ v.aE=1; v.aS=1; } }
+        else if(v.aS===1){ v.aE+=(v.aL-v.aE)*v.aC; if(t>=v.off) v.aS=2; }
+        else { v.aE-=v.aE*rCo; if(v.aE<1e-4){ v.on=false; continue; } }
+        if(v.iS===0){ v.iE+=v.iI; if(v.iE>=1){ v.iE=1; v.iS=1; } }
+        else { v.iE+=(v.iL-v.iE)*v.iC; }
+        const fbv=(v.m1+v.m2)*0.5*v.fb;
+        const sm=Math.sin(TAU*v.pm+fbv);
+        v.m2=v.m1; v.m1=sm;
+        const sc=Math.sin(TAU*v.pc+v.idx*v.iE*sm);
+        v.pm+=v.dm; if(v.pm>=1) v.pm-=1;
+        v.pc+=v.dc; if(v.pc>=1) v.pc-=1;
+        const x=sc*v.aE*v.lvl;
+        l+=x*v.pl; r+=x*v.pr;
+      }
+      L[i]=l*0.22; R[i]=r*0.22;
+    }
+    return true;
+  }
+}
+registerProcessor('jl',JL);
+`;
+
+let ac=null,node=null,ready=false,wurl=null;
 function audio(){
   if(!ac){
     ac=new (window.AudioContext||window.webkitAudioContext)();
-    bus=ac.createGain(); bus.gain.value=0.2; bus.connect(ac.destination);
-  }
-  if(ac.state==="suspended") ac.resume();
+    ac.resume();
+    if(!wurl) wurl=URL.createObjectURL(new Blob([WSRC],{type:'application/javascript'}));
+    if(ac.audioWorklet){
+      ac.audioWorklet.addModule(wurl).then(function(){
+        node=new AudioWorkletNode(ac,'jl',{outputChannelCount:[2]});
+        node.connect(ac.destination);
+        ready=true;
+      }).catch(function(){ ready=false; });
+    }
+  } else if(ac.state==="suspended") ac.resume();
   return ac;
 }
 function tA(v){ return 0.0006*Math.pow(900,v/99); }
 function tD(v){ return 0.004*Math.pow(500,v/99); }
 
+const PANL=[0.94,0.707,0.34], PANR=[0.34,0.707,0.94];
+
 function note(t0,p,gate,oct){
+  if(!ready||!node) return;
   const midi=12*(oct+1)+degToSemi(p.pitch);
-  const fc=440*Math.pow(2,(midi-69)/12), fm=fc*ratOf(p.mrat);
-  const car=ac.createOscillator(); car.type="sine"; car.frequency.value=fc;
-  const mod=ac.createOscillator(); mod.type="sine"; mod.frequency.value=fm;
-  const mg=ac.createGain(), amp=ac.createGain(), pan=ac.createStereoPanner();
-  const pI=p.midx/99*12*fm, eI=pI*p.mend/99, ia=tA(p.matk), idd=tD(p.mdec);
-  mg.gain.setValueAtTime(0,t0);
-  mg.gain.linearRampToValueAtTime(pI,t0+ia);
-  mg.gain.setTargetAtTime(eI,t0+ia,idd/3);
-  const pA=p.lvl/99, eA=pA*p.end/99, aa=tA(p.atk), ad=tD(p.dec);
-  amp.gain.setValueAtTime(0,t0);
-  amp.gain.linearRampToValueAtTime(pA,t0+aa);
-  amp.gain.setTargetAtTime(eA,t0+aa,ad/3);
-  const off=t0+Math.max(gate,aa+0.01);
-  amp.gain.setTargetAtTime(0,off,0.006);
-  pan.pan.value=[-0.7,0,0.7][p.pan];
-  mod.connect(mg); mg.connect(car.frequency);
-  car.connect(amp); amp.connect(pan); pan.connect(bus);
-  car.start(t0); mod.start(t0);
-  car.stop(off+0.08); mod.stop(off+0.08);
+  const fc=440*Math.pow(2,(midi-69)/12);
+  const sr=ac.sampleRate, f=p.mfdk/99;
+  node.port.postMessage({
+    t:Math.round(t0*sr),
+    fc:fc, fm:fc*ratOf(p.mrat),
+    idx:(p.midx/99)*12,
+    fb:f*f*3.5,                  // 0-3.5 rad，平方讓低段手動好調
+    lvl:p.lvl/99,
+    pl:PANL[p.pan], pr:PANR[p.pan],
+    gate:Math.round(gate*sr),
+    aA:Math.round(tA(p.atk)*sr),  aD:Math.round(tD(p.dec)*sr/3),  aL:p.end/99,
+    iA:Math.round(tA(p.matk)*sr), iD:Math.round(tD(p.mdec)*sr/3), iL:p.mend/99
+  });
 }
 
 /* clock */
@@ -267,7 +383,7 @@ function sdur(){ return 60/S.bpm/4; }
 function sched(){
   while(nextT<ac.currentTime+LOOK){
     const st=S.step;
-    const t0=nextT+((st%2===1)?sdur()*(S.swing/100)*0.5:0);
+    const t0=nextT+((st%2===1)?sdur()*(S.swing-50)/50:0);
     S.tracks.forEach(function(t,ti){
       if(!hit(st,t)) return;
       const p={},sn={};
@@ -312,31 +428,57 @@ function fit(){
 
 function play(){
   audio(); S.playing=true; S.step=0;
-  nextT=ac.currentTime+0.05; sched();
+  nextT=ac.currentTime+0.3; sched();
   const b=$("play"); b.classList.add("on"); b.textContent="STOP";
 }
 function halt(){
   S.playing=false; clearTimeout(timer); vq.length=0;
+  if(node) node.port.postMessage({stop:1});
   const b=$("play"); b.classList.remove("on"); b.textContent="PLAY";
   document.querySelectorAll(".cell.now").forEach(function(e){ e.classList.remove("now"); });
 }
 
 /* random */
-function rv(s){
-  if(s.ratio){
-    /* 沿用舊版分子/分母的分布：抽 1-8 比 1-8，四捨五入到十分位，
-       落在範圍外就重抽。中位數 1.2、整數比 38%、0.5 倍數 54% */
-    for(let k=0;k<32;k++){
-      const v=Math.round(ri(1,8)/ri(1,8)*10);
-      if(v>=s.min&&v<=s.max) return v;
-    }
-    return 10;
+/* 每個參數一張權重表，重抽照表抽，擾動用 Metropolis 走，
+   兩者的長期分布因此必然相同 */
+function buildW(s){
+  const n=s.max-s.min, r=s.rd||{}, w=[];
+  for(let i=0;i<=n;i++){
+    const t=(i+0.5)/(n+1);
+    let x;
+    if(r.w) x=(r.w[i]===undefined?0:r.w[i]);
+    else if(r.tri) x=0.15+(1-Math.abs(2*t-1));
+    else x=Math.pow(t,1/(r.p||1)-1);
+    w.push(x);
   }
-  return ri(s.min,s.max);
+  if(r.z){
+    let tot=0,i;
+    for(i=0;i<w.length;i++) tot+=w[i];
+    w[0]+=tot*r.z/(1-r.z);
+  }
+  return w;
 }
+SPEC.forEach(function(s){ s._w=buildW(s); });
+
+function rv(s){
+  if(s.ratio) return RATMODE[RM].rnd();
+  const w=s._w;
+  let tot=0,i;
+  for(i=0;i<w.length;i++) tot+=w[i];
+  let x=Math.random()*tot;
+  for(i=0;i<w.length;i++){ x-=w[i]; if(x<=0) return s.min+i; }
+  return s.max;
+}
+
 function nv(s,v){
+  if(s.ratio && RATMODE[RM].nudge) return RATMODE[RM].nudge(v);
   const sp=s.nsp||Math.max(1,Math.round((s.max-s.min)*0.10));
-  return clamp(v+ri(-sp,sp),s.min,s.max);
+  const c=v+ri(-sp,sp);
+  /* 出界就不動，不能 clamp：clamp 會讓提議不對稱，穩態會偏到端點去 */
+  if(c<s.min||c>s.max||c===v) return v;
+  const w=s._w, a=w[v-s.min], b=w[c-s.min];
+  if(b>=a || Math.random()<b/a) return c;
+  return v;
 }
 
 /* ---- ui ---- */
@@ -486,11 +628,23 @@ function tabs(){
   });
 }
 
+const MRAT=SPEC.filter(function(s){ return s.id==="mrat"; })[0];
+function setRatMode(m){
+  const from=RATMODE[RM], to=RATMODE[m];
+  S.tracks.forEach(function(t){
+    const L=t.lanes.mrat;
+    for(let i=0;i<N;i++) L.vals[i]=to.enc(from.of(L.vals[i]));
+  });
+  RM=m; MRAT.min=to.min; MRAT.max=to.max; MRAT.nsp=to.nsp;
+  hdr(); drawLane(MRAT);
+}
+
 function hdr(){
   $("v-bpm").textContent=S.bpm;
   $("v-swing").textContent=S.swing;
   $("b-root").textContent=NOTE[S.root];
   $("b-scale").textContent=SCALES[S.scale].n;
+  $("b-rat").textContent=RATMODE[RM].n;
 }
 
 function frame(){
@@ -537,6 +691,7 @@ function bindPick(el,get,set,count){
   el.addEventListener("pointerup",up);
   el.addEventListener("pointercancel",up);
 }
+$("b-rat").onclick=function(){ setRatMode(RM?0:1); };
 bindPick($("b-root"), function(){return S.root;}, function(v){S.root=v;}, 12);
 bindPick($("b-scale"),function(){return S.scale;},function(v){S.scale=v;}, SCALES.length);
 $("dtrk").onclick=function(){
@@ -563,7 +718,7 @@ document.querySelectorAll("[data-n]").forEach(function(b){
   b.onclick=function(){
     const k=b.dataset.n,d=+b.dataset.d;
     if(k==="bpm")   S.bpm=clamp(S.bpm+d,40,240);
-    if(k==="swing") S.swing=clamp(S.swing+d,0,60);
+    if(k==="swing") S.swing=clamp(S.swing+d,50,80);
     hdr();
   };
 });
