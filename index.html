@@ -178,7 +178,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       padding-left:.2em;
       box-shadow:inset -1px 0 0 var(--panel),inset 0 -1px 0 var(--panel)}
 .cell.off{background:none;box-shadow:none}
-.cell.off::after{content:"";width:2px;height:2px;background:#242424}
+.cell.off::after{content:"";width:2px;height:2px;background:var(--dim)}   /* 和骰子同一個灰 */
 .cell.off:hover::after{width:4px;height:4px;background:var(--amber)}
 .cell.hit{background:var(--amber)}
 .cell.cut{opacity:.32}
@@ -204,7 +204,24 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       width:var(--tail);height:var(--bh);display:flex;align-items:center;justify-content:flex-end}
 .snap svg{width:var(--cw);height:var(--cw);display:block}
 .snap .fl{display:none}
-.snap.has{color:var(--amber)}
+/* 快照：相機左邊排底片，最舊的緊貼相機（最右邊），新的往左排 */
+/* 快照放在標題列最右邊，右緣對齊下方各區塊的按鈕欄 */
+.shots{position:relative;width:var(--cw);height:var(--bh);margin-left:auto;margin-right:var(--pad)}
+.shots .snap{position:absolute;right:0;top:0;width:var(--cw)}
+.films{position:absolute;top:0;height:var(--bh);right:calc(var(--cw) + 6px);display:flex;flex-direction:row-reverse;align-items:center;gap:4px}
+.film{background:none;border:none;padding:0;width:var(--cw);height:var(--cw);color:var(--amber);cursor:pointer;position:relative}
+.film svg{width:var(--cw);height:var(--cw);display:block}
+.film .fl{display:none}
+.film:hover,.film.hit{color:#fff;background:none}
+.film:hover .ol,.film.hit .ol{display:none}
+.film:hover .fl,.film.hit .fl{display:inline}
+.film:active{background:none}
+/* 滿了再拍：最右邊最舊的一張消失，其餘往右挪，底片上方閃一下向右的小箭頭 */
+.film::before{content:"";position:absolute;left:50%;top:-6px;margin-left:-2px;width:0;height:0;
+  border-top:3px solid transparent;border-bottom:3px solid transparent;border-left:5px solid var(--amber);opacity:0}
+.films.shift .film::before{animation:shiftArrow .7s ease-out}
+@keyframes shiftArrow{0%{opacity:1;transform:translateX(-4px)}70%{opacity:1;transform:translateX(2px)}100%{opacity:0;transform:translateX(2px)}}
+@media (prefers-reduced-motion:reduce){ .films.shift .film::before{animation:none} }
 .snap:hover{color:#fff;background:none}
 .snap:active{background:none}
 .snap:hover .ol{display:none}
@@ -262,6 +279,10 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 <div class="head">
   <button class="big" id="b-globe" title="選擇地點">JETLAG</button>
   <button class="loc" id="b-loc" title="回到地球儀"><span class="l1"><span class="cd" id="loc-cd"></span><span class="tm" id="loc-tm"></span><span class="tm" id="loc-tp"></span></span><span class="l2"><span id="loc-co"></span><span class="wx" id="loc-wx"></span></span></button>
+  <div class="shots">
+    <div class="films" id="films"></div>
+    <button class="snap" id="bsnap" title="TAKE SNAPSHOT"><svg viewBox="0 0 24 24"><use class="ol" href="#camO"/><use class="fl" href="#camF"/></svg></button>
+  </div>
 </div>
 
 <div class="mod">
@@ -275,7 +296,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
       <button class="pick" id="b-scale" title="SCALE"></button>
       <button class="icn tap" id="b-undo" title="UNDO"><svg><use href="#undo"/></svg></button>
     </div>
-    <button class="snap" id="bsnap"><svg viewBox="0 0 24 24"><use class="ol" href="#camO"/><use class="fl" href="#camF"/></svg></button>
+    <span></span>
   </div>
   <div class="row">
     <span></span>
@@ -433,7 +454,7 @@ function makeTrack(i){
   return t;
 }
 
-const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shot:null,loc:null,wx:null,wxState:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
+const S={bpm:112,swing:50,mlen:16,root:0,scale:1,free:false,shots:[],loc:null,wx:null,wxState:null,greroll:nextReroll(),playing:false,step:0,g:0,cycle:0,sel:0,
          tracks:[0,1,2,3].map(makeTrack)};
 
 /* PITCH = 音階裡的第幾個音（0 = ROOT）。可用範圍隨音階長度變：MAJ/MIN 0-6、PNT 0-4、CHR 0-11。
@@ -1040,24 +1061,41 @@ function tabs(){
 
 /* SNAP：相機拍下當前狀態，膠捲把它叫回來。
    還原內容但不動指標——參數軌繼續跑在原本的相位上，換入是漸進的，不會有斷點 */
+const SHOT_MAX=4;
 function drawSnap(){
-  const b=$("bsnap");
-  b.classList.toggle("has",!!S.shot);
-  b.querySelector(".ol").setAttribute("href", S.shot?"#filO":"#camO");
-  b.querySelector(".fl").setAttribute("href", S.shot?"#filF":"#camF");
-  b.title = S.shot ? "RECALL SNAPSHOT" : "TAKE SNAPSHOT";
+  const box=$("films");
+  box.innerHTML="";
+  S.shots.forEach(function(sh,i){
+    const b=document.createElement("button");
+    b.className="film"; b.title="RECALL SNAPSHOT "+(i+1);
+    b.innerHTML='<svg viewBox="0 0 24 24"><use class="ol" href="#filO"/><use class="fl" href="#filF"/></svg>';
+    b.onclick=function(){
+      useShot(i);
+      b.classList.add("hit"); setTimeout(function(){ b.classList.remove("hit"); },250);
+    };
+    box.appendChild(b);
+  });
 }
 function takeShot(){
-  S.shot=JSON.stringify({t:S.tracks,m:S.mlen,f:S.free});
+  S.shots.push(JSON.stringify({t:S.tracks,m:S.mlen,f:S.free}));
+  const shifted=S.shots.length>SHOT_MAX;
+  if(shifted) S.shots.shift();
   drawSnap();
+  if(shifted){
+    const box=$("films");
+    box.classList.remove("shift"); void box.offsetWidth; box.classList.add("shift");
+    setTimeout(function(){ box.classList.remove("shift"); },750);
+  }
 }
-function useShot(){
-  if(!S.shot) return;
+/* 叫回快照：還原內容但不動指標，參數軌繼續跑在原本的相位上。底片會留著，可以重複叫回 */
+function useShot(i){
+  const sh=S.shots[i];
+  if(!sh) return;
   snap();
-  const d=JSON.parse(S.shot);
+  const d=JSON.parse(sh);
   S.mlen=d.m; S.free=d.f;
-  d.t.forEach(function(src,i){
-    const t=S.tracks[i];
+  d.t.forEach(function(src,k){
+    const t=S.tracks[k];
     t.mute=src.mute; t.solo=src.solo; t.rate=src.rate; t.oct=src.oct;
     t.steps=src.steps; t.pulses=src.pulses; t.rot=src.rot;
     SPEC.forEach(function(sp){
@@ -1066,8 +1104,7 @@ function useShot(){
       L.idx=L.idx%L.len;
     });
   });
-  S.shot=null;
-  drawSnap(); drawLen(); drawTrig(); lanes();
+  drawLen(); drawTrig(); lanes();
 }
 
 /* UNDO：任何會改動內容的操作前先存一份完整狀態；拖曳只在按下時存一次 */
@@ -1126,7 +1163,7 @@ $("play").onclick=function(){ S.playing?halt():play(); };
 $("mute").onclick=function(){ const t=S.tracks[S.sel]; t.mute=!t.mute; drawTrig(); };
 $("solo").onclick=function(){ const t=S.tracks[S.sel]; t.solo=!t.solo; drawTrig(); };
 $("b-undo").onclick=undo;
-$("bsnap").onclick=function(){ S.shot?useShot():takeShot(); };
+$("bsnap").onclick=takeShot;
 $("bfree").onclick=function(){ snap(); S.free=!S.free; drawTrig(); };
 $("dall").onclick=function(){
   snap();
@@ -1529,10 +1566,42 @@ function moonIllum(t){
   const syn=29.530588853, age=(((t/86400000+2440587.5-2451550.1)%syn)+syn)%syn;
   return (1-Math.cos(2*Math.PI*age/syn))/2;
 }
+/* ---- 參考骰子的機率曲線 ----
+   資料先換成 0–1 的位置，再依該參數骰子分布的累積機率換成數值。
+   兩端維持目前平衡後的範圍，中間的分布形狀跟骰子一致：骰子常出現的區段變化細，少見的數值要資料夠極端才會出現 */
+function cdfAt(s,v){
+  const w=wOf(s); let tot=0,c=0;
+  for(let i=0;i<w.length;i++){ tot+=w[i]; if(s.min+i<=v) c+=w[i]; }
+  return c/tot;
+}
+function quantAt(s,u){
+  const w=wOf(s); let tot=0,i;
+  for(i=0;i<w.length;i++) tot+=w[i];
+  let c=0;
+  for(i=0;i<w.length;i++){ c+=w[i]; if(c>=u*tot-1e-9) return s.min+i; }
+  return s.min+w.length-1;
+}
+/* a：資料在 0 時的數值，b：資料在 1 時的數值 */
+function qmap(id,a,b,u){
+  const s=SPEC.find(function(x){ return x.id===id; });
+  const ca=cdfAt(s,a), cb=cdfAt(s,b);
+  return quantAt(s, ca+(cb-ca)*clamp(u,0,1));
+}
+function panQ(u){ return quantAt(SPEC[1], clamp(u,0.001,1)); }   // 骰子權重 L 1 : C 2 : R 1
+/* MRAT：骰子是兩個 1–8 的整數相除，越常出現的比值越單純。依出現次數排序，取最常見的 12 個 */
+const RATF=(function(){
+  const cnt={};
+  for(let a=1;a<=8;a++) for(let b=1;b<=8;b++){ const v=Math.round(a/b*10); if(v>=5&&v<=80) cnt[v]=(cnt[v]||0)+1; }
+  return Object.keys(cnt).map(Number).sort(function(x,y){ return cnt[y]-cnt[x]||x-y; }).slice(0,12)
+    .map(function(v){ return [v,cnt[v]]; });
+})();
+function ratQ(u){
+  let tot=0; RATF.forEach(function(r){ tot+=r[1]; });
+  let c=0;
+  for(let i=0;i<RATF.length;i++){ c+=RATF[i][1]; if(c>=clamp(u,0,1)*tot-1e-9) return RATF[i][0]; }
+  return RATF[RATF.length-1][0];
+}
 function digits(str){ return str.replace(/[^0-9]/g,"").split("").map(Number).slice(0,16); }
-const RATS=[10,20,30,40,15,25,35,50,12,14,16,18,11,13,17,19];   // 由簡單到複雜的 FM 比值（×10）
-/* 注意：不能叫 ratOf，合成器用 ratOf(v)=v/10 把 MRAT 換成比值，同名會把它蓋掉 */
-function mapRat(u){ return RATS[Math.round(clamp(u,0,1)*11)]; }   // 由簡單到複雜，用前 12 個比值
 
 /* 參數軌的週期：資料從現在開始，走到下一個轉折點（由升轉降或由降轉升）是第幾小時。
    一路單調到 16 小時都沒轉折就是 16；完全不變就是 1 */
@@ -1575,20 +1644,18 @@ function mapPlace(L,W){
 
   /* ---- 參數軌：raw 是逐時原始資料（決定週期），f 把原始值換成參數值 ---- */
   const lane=function(raw,f){ const n=cycleLen(raw); return raw.slice(0,n).map(f); };
-  const drift=function(i){ const e=-Math.sin(wdir[i]*RAD); return (ws[i]>=12&&Math.abs(e)>0.38)?(e>0?2:0):1; };
-  const panSin=function(v){ return v>0.38?2:(v<-0.38?0:1); };
   const hourOf=function(i){ return (hh+mm/60+i)%24; };
 
   const shared={
-    atk:  lane(gust,  function(g){ return Math.round(27-clamp(g/80,0,1)*23); }),      // 陣風越強起音越硬（27→4）
-    matk: lane(ws,    function(w){ return Math.round(27-clamp(w/60,0,1)*22); }),      // 持續風速（27→5）
-    dec:  lane(hum,   function(h){ return Math.round(20+h*0.55); }),                    // 越潮濕尾巴越長（20→75）
-    end:  lane(hum,   function(h){ return Math.round(clamp((h-40)/60,0,1)*50); }),
-    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(8+clamp((e+12)/52,0,1)*54); }),   // 夜 8，太陽 40° 以上就到最亮 62
-    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(clamp(e,0,40)/40*32); }),   // 調變持續量，太陽 40° 以上 32
+    atk:  lane(gust,  function(g){ return qmap("atk",27,4,g/80); }),         // 陣風越強起音越硬（27→4）
+    matk: lane(ws,    function(w){ return qmap("matk",27,5,w/60); }),        // 持續風速（27→5）
+    dec:  lane(hum,   function(h){ return qmap("dec",20,75,h/100); }),       // 越潮濕尾巴越長（20→75）
+    end:  lane(hum,   function(h){ return qmap("end",0,50,(h-40)/60); }),
+    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return qmap("midx",8,62,(e+12)/52); }),   // 夜 8，太陽 40° 以上就到最亮 62
+    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return qmap("mend",0,32,e/40); }),   // 調變持續量，太陽 40° 以上 32
     mfdk: lane(wet.map(function(v,i){ return v+(code[i]>=95?100:0); }),
-               function(v){ return Math.min(99,Math.round(clamp((v%100)/2,0,1)*40)+(v>=100?22:0)); }),   // 雨量與降雨機率，雷雨再加
-    mdec: lane(cloud, function(c){ return Math.round(10+c*0.6); })
+               function(v){ return Math.min(99,qmap("mfdk",0,40,(v%100)/2)+(v>=100?22:0)); }),   // 雨量與降雨機率，雷雨再加
+    mdec: lane(cloud, function(c){ return qmap("mdec",10,70,c/100); })
   };
 
   const T=[
@@ -1598,9 +1665,9 @@ function mapPlace(L,W){
       rot: function(st){ return Math.round(sun[0].az/360*st)%st; },    // 太陽方位角
       oct: Math.abs(L.lat)<23.44?5:(Math.abs(L.lat)<66.56?4:3),        // 熱帶 5、溫帶 4、寒帶 3
       pit: digits(latTxt(L.lat)),
-      pan: lane(sun.map(function(s){ return Math.sin(s.az*RAD); }), panSin),   // 太陽在東偏右、在西偏左
-      lvl: lane(cloud, function(c){ return Math.round(99-c*0.5); }),   // 雲越厚越小聲
-      mrat: lane(cloud, function(c){ return mapRat(c/100); })
+      pan: lane(sun.map(function(s){ return Math.sin(s.az*RAD); }), function(v){ return panQ((v+1)/2); }),   // 太陽在東偏右、在西偏左
+      lvl: lane(cloud, function(c){ return qmap("lvl",99,49,c/100); }),   // 雲越厚越小聲
+      mrat: lane(cloud, function(c){ return ratQ(c/100); })
     },
     { /* 2 經度與時差 */
       steps: 4+Math.round(Math.abs(L.lon)/180*12),                     // 離本初子午線越遠循環越長（4–16，不會只剩 3 格）
@@ -1608,9 +1675,9 @@ function mapPlace(L,W){
       rot: function(st){ return ((lag%st)+st)%st; },                    // 和你的時差
       oct: lagA<5?3:(lagA<10?4:5),
       pit: digits(lonTxt(L.lon)),
-      pan: lane(hours.map(function(){ return lag; }), function(v){ return v>0?2:(v<0?0:1); }),
-      lvl: lane(hours.map(function(){ return lagA; }), function(v){ return clamp(95-v*2,60,95); }),   // 時差越大越小聲，差距比之前小
-      mrat: lane(hours.map(function(){ return lagA; }), function(v){ return mapRat(Math.min(v,12)/24); })   // 時差影響減半，最多到 1.5
+      pan: lane(hours.map(function(){ return lag; }), function(v){ return panQ(v>0?1:(v<0?0:0.5)); }),
+      lvl: lane(hours.map(function(){ return lagA; }), function(v){ return qmap("lvl",95,60,v/17.5); }),   // 時差越大越小聲
+      mrat: lane(hours.map(function(){ return lagA; }), function(v){ return ratQ(Math.min(v,12)/24); })   // 時差影響減半
     },
     { /* 3 當地時間 */
       steps: ((hh%12)||12)+4,                                            // 時針 + 4（5–16，一點鐘不會只剩 1 格）
@@ -1618,10 +1685,10 @@ function mapPlace(L,W){
       rot: function(st){ return ss%st; },                                // 秒針
       oct: hh<8?1:(hh<16?2:3),
       pit: digits(hm),
-      pan: lane(hours.map(function(i){ return Math.sin(hourOf(i)/12*2*Math.PI); }), panSin),   // 時針指向
+      pan: lane(hours.map(function(i){ return Math.sin(hourOf(i)/12*2*Math.PI); }), function(v){ return panQ((v+1)/2); }),   // 時針指向
       lvl: lane(hours.map(function(i){ return Math.cos((hourOf(i)-12)/24*2*Math.PI); }),
-                function(c){ return Math.round(60+39*(1+c)/2); }),       // 中午最響、午夜最輕
-      mrat: lane(pres, function(p){ return mapRat((1030-p)/55); })        // 氣壓越低比值越複雜
+                function(c){ return qmap("lvl",60,99,(1+c)/2); }),       // 中午最響、午夜最輕
+      mrat: lane(pres, function(p){ return ratQ((1030-p)/55); })        // 氣壓越低比值越複雜
     },
     { /* 4 天氣 */
       steps: 3+Math.round(cur.relative_humidity_2m/100*13),              // 越潮濕循環越長
@@ -1629,9 +1696,9 @@ function mapPlace(L,W){
       rot: function(st){ return Math.round(cur.wind_direction_10m/360*st)%st; },   // 風向
       oct: cur.temperature_2m<5?3:(cur.temperature_2m<25?4:5),
       pit: digits(Math.abs(cur.temperature_2m).toFixed(1)),
-      pan: lane(ws.map(function(w,i){ return -Math.sin(wdir[i]*RAD)*w; }), function(v,i){ return drift(i); }),
-      lvl: lane(wet, function(v){ return Math.min(99,55+Math.round(v*22)); }),   // 雨量與降雨機率
-      mrat: lane(wet, function(v){ return mapRat(v/2); })
+      pan: lane(ws.map(function(w,i){ return -Math.sin(wdir[i]*RAD)*w; }), function(v){ return panQ(0.5+0.5*clamp(v/30,-1,1)); }),   // 往東吹偏右、往西吹偏左
+      lvl: lane(wet, function(v){ return qmap("lvl",55,99,v/2); }),   // 雨量與降雨機率
+      mrat: lane(wet, function(v){ return ratQ(v/2); })
     }
   ];
 
