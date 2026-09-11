@@ -106,14 +106,22 @@ body{
 .zoom .zc .zi{position:absolute;left:4px;top:3px;font-family:'Manolo Mono',monospace;font-size:var(--fs);color:var(--dim)}
 .zoom .zc.sel{outline:2px solid var(--amber);outline-offset:-2px;z-index:1}
 .zoom .zc.off .zi{display:none}
-.zoom .zmid{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
-.zoom .zhead{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.zoom .zname{color:var(--amber);font-size:22px;line-height:22px;letter-spacing:.14em;font-weight:700}
-.zoom .ztools{display:flex;gap:4px}
-.zoom .ztools .tbtn{width:calc(var(--cw)*1.6);height:calc(var(--cw)*1.6)}
-.zoom .ztools svg{width:calc(var(--cw)*1.25);height:calc(var(--cw)*1.25)}
+/* 四個角：參數名左上、數值右下一條對角線；骰子右上、T/C 左下另一條對角線 */
+.zoom .zmid{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto 1fr auto;
+            grid-template-areas:"name dice" ". ." "mode val"}
+.zoom .zname{grid-area:name;align-self:start;margin-top:-.13em;   /* Doto 字頂上方留白，往上補齊骰子的上緣 */
+  color:var(--amber);font-size:22px;line-height:22px;letter-spacing:.14em;font-weight:700}
+.zoom .zmid .tbtn{width:calc(var(--cw)*1.5);height:calc(var(--cw)*1.5)}
+.zoom .zmid .tbtn svg{width:100%;height:100%}
+#z-dice{grid-area:dice;justify-self:end;align-self:start}
+#z-mode{grid-area:mode;justify-self:start;align-self:end;margin-bottom:1px}
+.zoom .zvbox{grid-area:val;justify-self:end;align-self:end}
+/* 區塊正中間：目前所在的軌道 */
+.zoom .zmid{position:relative}
+.zoom .ztrk{position:absolute;left:50%;top:50%;transform:translate(calc(-50% + .05em),-50%);   /* Doto 數字的字身偏左 0.05em，補回才會真正置中 */
+  pointer-events:none;
+            font-size:calc(var(--zc)*0.95);line-height:1;font-weight:700;color:var(--white)}
 .zoom .zgrid{touch-action:none}
-.zoom .zsub{color:var(--dim);letter-spacing:.1em;margin-top:6px}
 .zoom .zval{font-family:'Manolo Mono',monospace;font-weight:400;color:var(--amber);font-size:calc(var(--zc)*0.62);line-height:1;text-align:right;margin-right:-.2em}
 .zoom .zrange{font-family:'Manolo Mono',monospace;font-weight:400;color:var(--dim);text-align:right}
 /* 推桿：拖曳位置直接對應數值（上大下小），黃色條是目前的值 */
@@ -306,12 +314,11 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
   <div class="zbody">
     <div class="zgrid" id="zgrid"></div>
     <div class="zmid">
-      <div>
-        <div class="zhead"><span class="zname" id="z-name"></span>
-          <span class="ztools"><button class="dice tbtn" id="z-dice"></button><button class="mode tbtn" id="z-mode"></button></span></div>
-        <div class="zsub" id="z-sub"></div>
-      </div>
-      <div><div class="zval" id="z-val"></div><div class="zrange" id="z-range"></div></div>
+      <span class="zname" id="z-name"></span>
+      <span class="ztrk" id="z-trk" aria-label="目前軌道"></span>
+      <button class="dice tbtn" id="z-dice"></button>
+      <button class="mode tbtn" id="z-mode"></button>
+      <div class="zvbox"><div class="zval" id="z-val"></div><div class="zrange" id="z-range"></div></div>
     </div>
     <div class="fader" id="fader" role="slider" tabindex="0" aria-label="數值">
       <div class="ffill" id="ffill"></div><div class="fthumb" id="fthumb"></div>
@@ -871,11 +878,11 @@ function drawZoom(){
   }
   const v=Math.min(L.vals[Z.sel],hi), u=hi>s.min?(v-s.min)/(hi-s.min):0;
   $("z-name").textContent=s.label;
+  $("z-trk").textContent=String(S.sel+1);
   diceSvg($("z-dice"), L.reroll?6:3);
   $("z-dice").title=L.reroll?"REROLL LEN + VALUES":"NUDGE VALUES";
   if(!$("z-mode").firstChild) $("z-mode").innerHTML=MODESVG;
   setMode($("z-mode"),L.mode);
-  $("z-sub").textContent="TRK "+(S.sel+1)+"  STEP "+pad2(Z.sel+1)+"/"+pad2(L.len);
   $("z-val").textContent=dsp(s,v);
   $("z-range").textContent=dsp(s,s.min)+"-"+dsp(s,hi);
   $("ffill").style.height="calc((100% - 2px)*"+u+")";
