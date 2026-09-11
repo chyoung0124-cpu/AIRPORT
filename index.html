@@ -1446,6 +1446,7 @@ function globeClose(){
    按下 LAND 後抓 Open-Meteo 的即時天氣，連同經緯度、當地時間、太陽位置，一次覆寫整個序列。
    沒有任何亂數：同一個地點、同一分鐘、同樣的天氣，得到的序列一定相同 */
 const WX_VARS="temperature_2m,relative_humidity_2m,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m";
+const WX_HOURLY=WX_VARS+",precipitation_probability";   // 降雨機率只有逐時資料
 /* 抓不到天氣時用國際標準大氣的海平面條件（15°C、1013 hPa），其餘取無風、無雨、半雲。
    這時沒有逐時預報，天氣類參數的週期都會是 1 */
 const WX_STD={temperature_2m:15,relative_humidity_2m:50,precipitation:0,weather_code:2,cloud_cover:50,
@@ -1454,7 +1455,7 @@ const WX_STD={temperature_2m:15,relative_humidity_2m:50,precipitation:0,weather_
 /* 即時值加上逐時預報。預報從「目前這一小時」開始取 17 筆（現在 + 往後 16 小時） */
 function fetchWx(lat,lon){
   const url="https://api.open-meteo.com/v1/forecast?latitude="+lat.toFixed(2)+"&longitude="+lon.toFixed(2)+
-            "&current="+WX_VARS+"&hourly="+WX_VARS+"&forecast_days=2";
+            "&current="+WX_VARS+"&hourly="+WX_HOURLY+"&forecast_days=2";
   const ctl=window.AbortController?new AbortController():null;
   const tm=setTimeout(function(){ if(ctl) ctl.abort(); },6000);
   return fetch(url,ctl?{signal:ctl.signal}:{})
@@ -1471,9 +1472,10 @@ function fetchWx(lat,lon){
 }
 /* 第 i 小時的值（i=0 是目前這一小時）；沒有預報就一直用即時值 */
 function wxAt(W,key,i){
-  if(!W) return WX_STD[key];
-  if(W.hourly){ const v=W.hourly[key][W.i0+i]; if(v!==null&&v!==undefined) return v; }
-  return W.cur[key];
+  if(!W) return WX_STD[key]||0;
+  if(W.hourly&&W.hourly[key]){ const v=W.hourly[key][W.i0+i]; if(v!==null&&v!==undefined) return v; }
+  const c=W.cur[key];
+  return (c===undefined||c===null) ? (WX_STD[key]||0) : c;
 }
 
 /* WMO 天氣代碼 → 航空氣象報告（METAR）的縮寫，和 SCALE */
@@ -1530,7 +1532,7 @@ function moonIllum(t){
 function digits(str){ return str.replace(/[^0-9]/g,"").split("").map(Number).slice(0,16); }
 const RATS=[10,20,30,40,15,25,35,50,12,14,16,18,11,13,17,19];   // 由簡單到複雜的 FM 比值（×10）
 /* 注意：不能叫 ratOf，合成器用 ratOf(v)=v/10 把 MRAT 換成比值，同名會把它蓋掉 */
-function mapRat(u){ return RATS[Math.round(clamp(u,0,1)*7)]; }    // 只用前 8 個諧和比值
+function mapRat(u){ return RATS[Math.round(clamp(u,0,1)*15)]; }   // 由簡單到複雜，全部 16 個比值
 
 /* 參數軌的週期：資料從現在開始，走到下一個轉折點（由升轉降或由降轉升）是第幾小時。
    一路單調到 16 小時都沒轉折就是 16；完全不變就是 1 */
@@ -1544,12 +1546,6 @@ function cycleLen(raw){
   }
   return dir?16:1;
 }
-/* T/C：這一段值的起伏超過該參數全幅的四成，就每個音走一格（T）；起伏小就每一圈走一格（C） */
-function modeOf(vals,span){
-  const lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
-  return (span>0 && (hi-lo)/span>=0.4) ? "T" : "C";
-}
-
 function mapPlace(L,W){
   const now=Date.now(), H=17;
   const hours=[]; for(let i=0;i<H;i++) hours.push(i);
@@ -1557,7 +1553,9 @@ function mapPlace(L,W){
   const temp=wxs("temperature_2m"), hum=wxs("relative_humidity_2m"), rain=wxs("precipitation").map(function(v){ return Math.max(0,v); }),
         code=wxs("weather_code"), cloud=wxs("cloud_cover"), pres=wxs("pressure_msl"),
         ws=wxs("wind_speed_10m"), wdir=wxs("wind_direction_10m"),
-        gust=wxs("wind_gusts_10m").map(function(g,i){ return Math.max(g,ws[i]); });
+        gust=wxs("wind_gusts_10m").map(function(g,i){ return Math.max(g,ws[i]); }),
+        prob=wxs("precipitation_probability");
+  const wet=rain.map(function(r,i){ return Math.min(r,10)/10+prob[i]/100; });   // 0–2：雨量加降雨機率，沒下雨時也會隨機率起伏
   const cur=W?W.cur:WX_STD;
   const kind=wxKind(cur.weather_code);
 
@@ -1567,11 +1565,11 @@ function mapPlace(L,W){
   const off=offsetMin(L), lag=Math.round((off+new Date(now).getTimezoneOffset())/60), lagA=Math.abs(lag);
 
   /* ---- 主控 ---- */
-  S.bpm=Math.round(clamp(85+cur.temperature_2m*0.8,70,120));          // −10°C→77、20°C→101、35°C→113
-  S.swing=Math.round(50+clamp(cur.wind_speed_10m,0,60)/60*16);         // 無風 50、60 km/h 以上 66
+  S.bpm=Math.round(clamp(100+cur.temperature_2m,70,150));             // −20°C→80、40°C→140
+  S.swing=Math.round(50+clamp(cur.wind_speed_10m,0,60)/60*25);         // 無風 50、60 km/h 以上 75
   S.root=((hh%12)*7)%12;                                               // 鐘面沿五度圈：12 點 C、1 點 G、2 點 D…
   S.scale=kind.sc;
-  S.mlen=8+Math.round(8*moonIllum(now));                               // 新月 8、滿月 16（太短會把各軌切成碎拍）
+  S.mlen=4+Math.round(12*moonIllum(now));                              // 新月 4、滿月 16
   S.free=!up;                                                          // 太陽在地平線下就自由走
   const SL=SCALES[S.scale].s.length;
 
@@ -1582,41 +1580,41 @@ function mapPlace(L,W){
   const hourOf=function(i){ return (hh+mm/60+i)%24; };
 
   const shared={
-    atk:  lane(gust,  function(g){ return Math.round(30-clamp(g/80,0,1)*22); }),      // 陣風越強起音越硬（30→8）
-    matk: lane(ws,    function(w){ return Math.round(30-clamp(w/60,0,1)*20); }),      // 持續風速（30→10）
-    dec:  lane(hum,   function(h){ return Math.round(25+h*0.5); }),                     // 越潮濕尾巴越長（25→75）
+    atk:  lane(gust,  function(g){ return Math.round(25*(1-clamp(g/80,0,1))); }),     // 陣風越強起音越硬
+    matk: lane(ws,    function(w){ return Math.round(25*(1-clamp(w/60,0,1))); }),     // 持續風速
+    dec:  lane(hum,   function(h){ return Math.round(15+h*0.6); }),                     // 越潮濕尾巴越長
     end:  lane(hum,   function(h){ return Math.round(clamp((h-40)/60,0,1)*50); }),
-    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(8+clamp((e+12)/52,0,1)*37); }),   // 夜 8，太陽 40° 以上就到最亮 45，白天大部分時間都偏亮
-    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(clamp(e,0,40)/40*26); }),   // 調變持續量，太陽 40° 以上 26，讓亮度撐得住
-    mfdk: lane(rain.map(function(r,i){ return r+(code[i]>=95?100:0); }),
-               function(r){ return Math.min(99,Math.round(clamp((r%100)/10,0,1)*30)+(r>=100?15:0)); }),
+    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(8+clamp((e+12)/52,0,1)*72); }),   // 夜 8，太陽 40° 以上就到最亮 80
+    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(clamp(e,0,40)/40*40); }),   // 調變持續量，太陽 40° 以上 40
+    mfdk: lane(wet.map(function(v,i){ return v+(code[i]>=95?100:0); }),
+               function(v){ return Math.min(99,Math.round(clamp((v%100)/2,0,1)*50)+(v>=100?30:0)); }),   // 雨量與降雨機率，雷雨再加
     mdec: lane(cloud, function(c){ return Math.round(10+c*0.6); })
   };
 
   const T=[
     { /* 1 太陽 */
       steps: clamp(Math.round(dl/24*16),3,16),                         // 日照越長循環越長
-      pulses: function(st){ return clamp(Math.round((sun[0].el+18)/108*st*0.65),1,st); },  // 太陽越高打點越多，最多 65%
+      pulses: function(st){ return clamp(Math.round((sun[0].el+18)/108*st),1,st); },   // 太陽越高打點越多
       rot: function(st){ return Math.round(sun[0].az/360*st)%st; },    // 太陽方位角
-      oct: Math.abs(L.lat)<23.44?4:(Math.abs(L.lat)<66.56?3:2),        // 熱帶 4、溫帶 3、寒帶 2
+      oct: Math.abs(L.lat)<23.44?5:(Math.abs(L.lat)<66.56?4:3),        // 熱帶 5、溫帶 4、寒帶 3
       pit: digits(latTxt(L.lat)),
       pan: lane(sun.map(function(s){ return Math.sin(s.az*RAD); }), panSin),   // 太陽在東偏右、在西偏左
       lvl: lane(cloud, function(c){ return Math.round(99-c*0.5); }),   // 雲越厚越小聲
       mrat: lane(cloud, function(c){ return mapRat(c/100); })
     },
     { /* 2 經度與時差 */
-      steps: 3+Math.round(Math.abs(L.lon)/180*13),                     // 離本初子午線越遠循環越長
-      pulses: function(st){ return clamp(Math.round(st*Math.abs(off)/60/24),1,st); },   // 距 UTC 幾小時，換成占循環的比例
+      steps: 4+Math.round(Math.abs(L.lon)/180*12),                     // 離本初子午線越遠循環越長（4–16，不會只剩 3 格）
+      pulses: function(st){ return clamp(Math.round(Math.abs(off)/60),1,st); },   // 距 UTC 幾小時
       rot: function(st){ return ((lag%st)+st)%st; },                    // 和你的時差
-      oct: lagA<5?3:4,
+      oct: lagA<5?3:(lagA<10?4:5),
       pit: digits(lonTxt(L.lon)),
       pan: lane(hours.map(function(){ return lag; }), function(v){ return v>0?2:(v<0?0:1); }),
       lvl: lane(hours.map(function(){ return lagA; }), function(v){ return clamp(95-v*2,60,95); }),   // 時差越大越小聲，差距比之前小
       mrat: lane(hours.map(function(){ return lagA; }), function(v){ return mapRat(Math.min(v,12)/24); })   // 時差影響減半，最多到 1.5
     },
     { /* 3 當地時間 */
-      steps: (hh%12)||12,                                                // 時針
-      pulses: function(st){ return clamp(Math.round(mm/60*st*0.5),1,st); }, // 分針，最多半數
+      steps: ((hh%12)||12)+4,                                            // 時針 + 4（5–16，一點鐘不會只剩 1 格）
+      pulses: function(st){ return clamp(Math.round(mm/60*st),1,st); }, // 分針
       rot: function(st){ return ss%st; },                                // 秒針
       oct: hh<8?1:(hh<16?2:3),
       pit: digits(hm),
@@ -1627,13 +1625,13 @@ function mapPlace(L,W){
     },
     { /* 4 天氣 */
       steps: 3+Math.round(cur.relative_humidity_2m/100*13),              // 越潮濕循環越長
-      pulses: function(st){ return clamp(1+Math.round(cur.cloud_cover/100*3)+Math.round(Math.min(Math.max(0,cur.precipitation),2)*2),1,st); },
+      pulses: function(st){ return clamp(1+Math.round(cur.cloud_cover/100*7)+Math.round(Math.min(Math.max(0,cur.precipitation),2)*4),1,st); },
       rot: function(st){ return Math.round(cur.wind_direction_10m/360*st)%st; },   // 風向
-      oct: cur.temperature_2m<10?3:4,
+      oct: cur.temperature_2m<5?3:(cur.temperature_2m<25?4:5),
       pit: digits(Math.abs(cur.temperature_2m).toFixed(1)),
       pan: lane(ws.map(function(w,i){ return -Math.sin(wdir[i]*RAD)*w; }), function(v,i){ return drift(i); }),
-      lvl: lane(rain, function(r){ return Math.min(99,55+Math.round(Math.min(r,4)*10)); }),
-      mrat: lane(rain, function(r){ return mapRat(r/5); })
+      lvl: lane(wet, function(v){ return Math.min(99,55+Math.round(v*22)); }),   // 雨量與降雨機率
+      mrat: lane(wet, function(v){ return mapRat(v/2); })
     }
   ];
 
@@ -1641,10 +1639,15 @@ function mapPlace(L,W){
     const r=T[ti];
     t.mute=false; t.solo=false;
     t.steps=r.steps; t.pulses=r.pulses(r.steps); t.rot=r.rot(r.steps); t.rate=16; t.oct=r.oct;   // RATE 不映射，固定 16
+    const swing={};
     const set=function(id,vals,span){
       const Ln=t.lanes[id];
-      Ln.len=vals.length; Ln.idx=0; Ln.mode=modeOf(vals,span);
-      const k=mm%vals.length;                       // 每過一分鐘，起點往後推一格，同一個地方每分鐘聽起來都有一點不同
+      Ln.len=vals.length; Ln.idx=0;
+      const lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
+      swing[id]= (vals.length>1&&span>0) ? (hi-lo)/span : -1;
+      /* 起點：當下分鐘 + 這一軌的 ROT（太陽方位、時差、秒數、風向）。
+         四軌共用的音色資料因此各自錯開，每分鐘也會再推一格 */
+      const k=(mm+t.rot)%vals.length;
       vals=vals.slice(k).concat(vals.slice(0,k));
       Ln.vals=new Array(N).fill(vals[vals.length-1]);
       vals.forEach(function(v,j){ Ln.vals[j]=v; });
@@ -1653,6 +1656,11 @@ function mapPlace(L,W){
     set("pitch",(r.pit.length?r.pit:[0]).map(function(d){ return d%SL; }), SL-1);
     set("pan",r.pan,2); set("lvl",r.lvl,sp("lvl")); set("mrat",r.mrat,sp("mrat"));
     ["atk","dec","end","midx","mfdk","matk","mdec","mend"].forEach(function(id){ set(id,shared[id],sp(id)); });
+    /* T/C：這一軌 12 條參數依起伏大小排序，起伏較大的一半用 T（每個音走一格），另一半用 C（每一圈走一格）。
+       長度 1 的軌只有一個值，T/C 不影響聲音，一律 C */
+    const ids=Object.keys(swing).sort(function(a,b){ return swing[b]-swing[a]; });
+    const nT=Math.ceil(ids.length/2);
+    ids.forEach(function(id,rank){ t.lanes[id].mode=(rank<nT&&swing[id]>=0)?"T":"C"; });
   });
 }
 
