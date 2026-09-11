@@ -1,5 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
 <title>JETLAG</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +12,7 @@
   font-weight:400;font-style:normal;font-display:block;
 }
 :root{
-  --board:#080808;
+  --board:#101010;   /* 和區塊同色，各區塊連成一整片 */
   --panel:#101010;
   --cell:#2e2e2e;
   --amber:#f5b301;
@@ -22,7 +23,10 @@
   --pad:6px; --fs:10px; --fcell:9px; --bh:15px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;background:var(--board)}
+/* 有些 App 內建的網頁預覽會把 body 背景蓋成白色，這層固定黑底墊在所有內容下面 */
+.bgfill{position:fixed;inset:0;background:var(--board);z-index:0;pointer-events:none}
+.rack{position:relative;z-index:1}
 body{
   background:var(--board);color:var(--white);
   font:var(--fs)/1 'Doto',ui-monospace,Menlo,Consolas,monospace;font-weight:600;
@@ -88,6 +92,39 @@ body{
 @media (prefers-reduced-motion:reduce){ .gl{transition:none} }
 
 .mod{background:var(--panel);padding:var(--pad);margin-bottom:6px}
+/* ---- 放大編輯：點參數名，下方出現 16 格放大版和推桿 ---- */
+.zoom{display:none}
+/* 只在手機這類觸控裝置啟用；電腦上參數名不能點，也不會出現 */
+@media (hover:none) and (pointer:coarse){
+  #lanes .gut{cursor:pointer}
+  #lanes .gut.zon{color:var(--amber)}
+  .zoom.on{display:block}
+}
+.zoom .zbody{display:flex;align-items:stretch;gap:calc(var(--pad)*1.5);--zc:calc(var(--cw)*2.4)}
+.zoom .zgrid{display:grid;grid-template-columns:repeat(4,var(--zc));grid-auto-rows:var(--zc);flex:none}
+.zoom .zc{width:var(--zc);height:var(--zc);font-size:calc(var(--fcell)*1.9);line-height:1;position:relative}
+.zoom .zc .zi{position:absolute;left:4px;top:3px;font-family:'Manolo Mono',monospace;font-size:var(--fs);color:var(--dim)}
+.zoom .zc.sel{outline:2px solid var(--amber);outline-offset:-2px;z-index:1}
+.zoom .zc.off .zi{display:none}
+.zoom .zmid{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.zoom .zhead{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.zoom .zname{color:var(--amber);font-size:22px;line-height:22px;letter-spacing:.14em;font-weight:700}
+.zoom .ztools{display:flex;gap:4px}
+.zoom .ztools .tbtn{width:calc(var(--cw)*1.6);height:calc(var(--cw)*1.6)}
+.zoom .ztools svg{width:calc(var(--cw)*1.25);height:calc(var(--cw)*1.25)}
+.zoom .zgrid{touch-action:none}
+.zoom .zsub{color:var(--dim);letter-spacing:.1em;margin-top:6px}
+.zoom .zval{font-family:'Manolo Mono',monospace;font-weight:400;color:var(--amber);font-size:calc(var(--zc)*0.62);line-height:1;text-align:right;margin-right:-.2em}
+.zoom .zrange{font-family:'Manolo Mono',monospace;font-weight:400;color:var(--dim);text-align:right}
+/* 推桿：拖曳位置直接對應數值（上大下小），黃色條是目前的值 */
+.zoom .fader{position:relative;flex:none;width:calc(var(--cw)*2.2);background:var(--cell);
+             box-shadow:inset 0 0 0 1px #3d3d3d;touch-action:none;cursor:ns-resize}
+.zoom .fader:focus-visible{outline:1px solid #fff;outline-offset:2px}
+.zoom .ffill{position:absolute;left:1px;right:1px;bottom:1px;background:#5c4300}
+.zoom .fthumb{position:absolute;left:0;right:0;height:4px;margin-top:-2px;background:var(--amber)}
+.zoom .ftick{position:absolute;left:0;width:5px;height:1px;background:#6e6e6e}
+.zoom.dead .fader{cursor:default}
+
 .hd{display:grid;grid-template-columns:var(--gut) 1fr var(--tail);align-items:center;margin-bottom:5px}
 /* TRK 標題列和 STEP 之間沒有尺標，補上同樣的高度，和 MSTR 標題列到 LEN 的距離一致 */
 .hd.far{margin-bottom:calc(var(--cw)*0.4 + 8px)}
@@ -212,6 +249,7 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 <circle cx="7" cy="18" r="1.9" fill="currentColor"/><circle cx="17" cy="18" r="1.9" fill="currentColor"/></symbol>
 </defs></svg>
 
+<div class="bgfill" aria-hidden="true"></div>
 <div class="rack">
 <div class="head">
   <button class="big" id="b-globe" title="選擇地點">JETLAG</button>
@@ -263,6 +301,23 @@ button:focus-visible{outline:1px solid var(--amber);outline-offset:1px}
 </div>
 
 <div class="mod" id="lanes"></div>
+
+<div class="mod zoom" id="zoom" aria-live="polite">
+  <div class="zbody">
+    <div class="zgrid" id="zgrid"></div>
+    <div class="zmid">
+      <div>
+        <div class="zhead"><span class="zname" id="z-name"></span>
+          <span class="ztools"><button class="dice tbtn" id="z-dice"></button><button class="mode tbtn" id="z-mode"></button></span></div>
+        <div class="zsub" id="z-sub"></div>
+      </div>
+      <div><div class="zval" id="z-val"></div><div class="zrange" id="z-range"></div></div>
+    </div>
+    <div class="fader" id="fader" role="slider" tabindex="0" aria-label="數值">
+      <div class="ffill" id="ffill"></div><div class="fthumb" id="fthumb"></div>
+    </div>
+  </div>
+</div>
 </div>
 
 <div class="gl" id="gl" role="dialog" aria-modal="true" aria-label="選擇地點">
@@ -772,6 +827,150 @@ function dsp(s,v){
   return String(v);
 }
 
+/* ---- 放大編輯：點參數名打開，再點一次關閉 ---- */
+const Z={id:null, sel:0};
+const ZMQ=window.matchMedia?window.matchMedia("(hover: none) and (pointer: coarse)"):null;
+function zOK(){ return !!(ZMQ&&ZMQ.matches); }
+if(ZMQ){
+  const zChange=function(){ if(zOK()&&!Z.id) Z.id="pitch"; zLabels(); drawZoom(); };
+  if(ZMQ.addEventListener) ZMQ.addEventListener("change",zChange); else if(ZMQ.addListener) ZMQ.addListener(zChange);
+}
+function zSpec(){ return Z.id ? SPEC.find(function(x){ return x.id===Z.id; }) : null; }
+if(zOK()) Z.id="pitch";                       // 手機上一開始就顯示 PIT
+function zToggle(id){
+  if(!zOK()||Z.id===id) return;
+  Z.id=id; Z.sel=0;
+  zLabels(); drawZoom();
+}
+function zLabels(){
+  document.querySelectorAll("#lanes .gut").forEach(function(g){ g.classList.toggle("zon", g.dataset.id===Z.id); });
+}
+function pad2(n){ return (n<10?"0":"")+n; }
+function drawZoom(){
+  const box=$("zoom"), s=zSpec();
+  box.classList.toggle("on",!!s);
+  if(!s) return;
+  const L=S.tracks[S.sel].lanes[s.id], hi=hiOf(s);
+  if(Z.sel>=L.len) Z.sel=L.len-1;
+  const g=$("zgrid");
+  if(g.children.length!==N){
+    g.innerHTML="";
+    for(let i=0;i<N;i++){
+      const c=document.createElement("div");
+      c.className="cell zc"; c.innerHTML='<span class="zi"></span><span class="zt"></span>';
+      g.appendChild(c);
+    }
+  }
+  for(let i=0;i<N;i++){
+    const c=g.children[i], on=i<L.len;
+    c.classList.toggle("off",!on);
+    c.classList.toggle("sel",on&&i===Z.sel);
+    c.children[0].textContent=pad2(i+1);
+    const t=on?dsp(s,Math.min(L.vals[i],hi)):"";
+    if(c.children[1].textContent!==t) c.children[1].textContent=t;
+  }
+  const v=Math.min(L.vals[Z.sel],hi), u=hi>s.min?(v-s.min)/(hi-s.min):0;
+  $("z-name").textContent=s.label;
+  diceSvg($("z-dice"), L.reroll?6:3);
+  $("z-dice").title=L.reroll?"REROLL LEN + VALUES":"NUDGE VALUES";
+  if(!$("z-mode").firstChild) $("z-mode").innerHTML=MODESVG;
+  setMode($("z-mode"),L.mode);
+  $("z-sub").textContent="TRK "+(S.sel+1)+"  STEP "+pad2(Z.sel+1)+"/"+pad2(L.len);
+  $("z-val").textContent=dsp(s,v);
+  $("z-range").textContent=dsp(s,s.min)+"-"+dsp(s,hi);
+  $("ffill").style.height="calc((100% - 2px)*"+u+")";
+  $("fthumb").style.top="calc(1px + (100% - 2px)*"+(1-u)+")";
+  const f=$("fader");
+  f.setAttribute("aria-valuemin",s.min); f.setAttribute("aria-valuemax",hi);
+  f.setAttribute("aria-valuenow",v); f.setAttribute("aria-valuetext",dsp(s,v));
+}
+/* 格子區：點一下選格；點空格把長度延伸到那一格；按住拖曳，長度跟著手指所在的格子（往回拖就減少） */
+(function(){
+  const g=$("zgrid");
+  let si=-1, x0=0, y0=0, sizing=false, dirty=false;
+  function idxAt(x,y){
+    const r=g.getBoundingClientRect();
+    const c=clamp(Math.floor((x-r.left)/(r.width/4)),0,3), w=clamp(Math.floor((y-r.top)/(r.height/4)),0,3);
+    return w*4+c;
+  }
+  function setLen(n){
+    const s=zSpec(); if(!s) return;
+    const L=S.tracks[S.sel].lanes[s.id];
+    n=clamp(n,1,N);
+    if(n===L.len) return;
+    if(!dirty){ dirty=true; snap(); }
+    L.len=n; L.idx=0;
+    if(Z.sel>=n) Z.sel=n-1;
+    drawLane(s);
+  }
+  g.addEventListener("pointerdown",function(e){
+    const s=zSpec(); if(!s) return;
+    si=idxAt(e.clientX,e.clientY); x0=e.clientX; y0=e.clientY; sizing=false; dirty=false;
+    g.setPointerCapture(e.pointerId); e.preventDefault();
+    if(si>=S.tracks[S.sel].lanes[s.id].len){ setLen(si+1); Z.sel=si; drawZoom(); sizing=true; }
+  });
+  g.addEventListener("pointermove",function(e){
+    if(si<0) return;
+    if(!sizing){
+      if(Math.abs(e.clientX-x0)<6 && Math.abs(e.clientY-y0)<6) return;
+      sizing=true;
+    }
+    setLen(idxAt(e.clientX,e.clientY)+1);
+  });
+  function up(){
+    if(si>=0 && !sizing){
+      const s=zSpec();
+      if(s && si<S.tracks[S.sel].lanes[s.id].len){ Z.sel=si; drawZoom(); }
+    }
+    si=-1;
+  }
+  g.addEventListener("pointerup",up);
+  g.addEventListener("pointercancel",function(){ si=-1; });
+  $("z-dice").onclick=function(){ const s=zSpec(); if(s) laneDice(s); };
+  $("z-mode").onclick=function(){ const s=zSpec(); if(s) laneMode(s); };
+})();
+(function(){
+  const f=$("fader");
+  let drag=false, dirty=false;
+  function put(v){
+    const s=zSpec(); if(!s) return;
+    const L=S.tracks[S.sel].lanes[s.id], x=clamp(v,s.min,hiOf(s));
+    if(x===L.vals[Z.sel]) return;
+    if(!dirty){ dirty=true; snap(); }
+    L.vals[Z.sel]=x; drawLane(s);
+  }
+  function fromY(y){
+    const s=zSpec(); if(!s) return;
+    const r=f.getBoundingClientRect(), hi=hiOf(s);
+    put(Math.round(s.min+clamp(1-(y-r.top)/r.height,0,1)*(hi-s.min)));
+  }
+  f.addEventListener("pointerdown",function(e){
+    if(!zSpec()) return;
+    drag=true; dirty=false; f.setPointerCapture(e.pointerId); e.preventDefault(); fromY(e.clientY);
+  });
+  f.addEventListener("pointermove",function(e){ if(drag) fromY(e.clientY); });
+  function up(){ drag=false; }
+  f.addEventListener("pointerup",up); f.addEventListener("pointercancel",up);
+  f.addEventListener("keydown",function(e){
+    const s=zSpec(); if(!s) return;
+    const d = (e.key==="ArrowUp"||e.key==="ArrowRight") ? 1 : (e.key==="ArrowDown"||e.key==="ArrowLeft") ? -1 : 0;
+    if(!d) return;
+    e.preventDefault(); dirty=false;
+    put(Math.min(S.tracks[S.sel].lanes[s.id].vals[Z.sel],hiOf(s))+d);
+  });
+})();
+
+function laneDice(s){
+  const L=S.tracks[S.sel].lanes[s.id];
+  snap();
+  if(L.reroll){ L.len=ri(1,8); L.idx=0; for(let i=0;i<L.len;i++) L.vals[i]=rv(s); }
+  else for(let i=0;i<L.len;i++) L.vals[i]=nv(s,L.vals[i]);
+  L.reroll=nextReroll(); drawLane(s);
+}
+function laneMode(s){
+  const L=S.tracks[S.sel].lanes[s.id];
+  snap(); L.mode=(L.mode==="C"?"T":"C"); L.idx=0; drawLane(s);
+}
 function drawLane(s){
   const L=S.tracks[S.sel].lanes[s.id];
   const sp=document.querySelector('#lanes .strip[data-id="'+s.id+'"]');
@@ -783,6 +982,7 @@ function drawLane(s){
   if(d){ diceSvg(d,L.reroll?6:3); d.title=L.reroll?"REROLL LEN + VALUES":"NUDGE VALUES"; }
   const m=document.querySelector('#lanes .mode[data-id="'+s.id+'"]');
   if(m) setMode(m,L.mode);
+  if(Z.id===s.id) drawZoom();
 }
 
 function lanes(){
@@ -791,18 +991,17 @@ function lanes(){
     const L=t.lanes[s.id];
     const row=document.createElement("div"); row.className="row";
     const g=document.createElement("span"); g.className="gut"; g.textContent=s.label;
+    g.dataset.id=s.id;
+    if(zOK()){ g.tabIndex=0; g.setAttribute("role","button"); }
+    g.onclick=function(){ zToggle(s.id); };
+    g.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); zToggle(s.id); } };
     const sp=document.createElement("div"); sp.className="strip"; sp.dataset.id=s.id;
     const d=document.createElement("button"); d.className="dice tbtn"; d.dataset.id=s.id;
-    d.onclick=function(){
-      snap();
-      if(L.reroll){ L.len=ri(1,8); L.idx=0; for(let i=0;i<L.len;i++) L.vals[i]=rv(s); }
-      else for(let i=0;i<L.len;i++) L.vals[i]=nv(s,L.vals[i]);
-      L.reroll=nextReroll(); drawLane(s);
-    };
+    d.onclick=function(){ laneDice(s); };
     const m=document.createElement("button"); m.className="mode tbtn"; m.dataset.id=s.id;
     m.title="T = 每顆音前進一格 / C = 每圈前進一格";
     m.innerHTML=MODESVG;
-    m.onclick=function(){ snap(); L.mode=(L.mode==="C"?"T":"C"); L.idx=0; drawLane(s); };
+    m.onclick=function(){ laneMode(s); };
     const tl=document.createElement("div"); tl.className="tail"; tl.append(d,m);
     row.append(g,sp,tl); box.appendChild(row);
     bindStrip(sp, function(){ return L.len; },
@@ -818,6 +1017,7 @@ function lanes(){
         } });
     drawLane(s);
   });
+  zLabels(); drawZoom();
 }
 
 function tabs(){
@@ -898,6 +1098,7 @@ function frame(){
             c.classList.toggle("now",i===e.sn[id]);
           });
         });
+        if(Z.id) Array.prototype.forEach.call($("zgrid").children,function(c,i){ c.classList.toggle("now",i===e.sn[Z.id]); });
       }
     }
     const t=S.tracks[S.sel];
@@ -1321,7 +1522,8 @@ function moonIllum(t){
 }
 function digits(str){ return str.replace(/[^0-9]/g,"").split("").map(Number).slice(0,16); }
 const RATS=[10,20,30,40,15,25,35,50,12,14,16,18,11,13,17,19];   // 由簡單到複雜的 FM 比值（×10）
-function ratOf(u){ return RATS[Math.round(clamp(u,0,1)*7)]; }    // 只用前 8 個諧和比值
+/* 注意：不能叫 ratOf，合成器用 ratOf(v)=v/10 把 MRAT 換成比值，同名會把它蓋掉 */
+function mapRat(u){ return RATS[Math.round(clamp(u,0,1)*7)]; }    // 只用前 8 個諧和比值
 
 /* 參數軌的週期：資料從現在開始，走到下一個轉折點（由升轉降或由降轉升）是第幾小時。
    一路單調到 16 小時都沒轉折就是 16；完全不變就是 1 */
@@ -1377,8 +1579,8 @@ function mapPlace(L,W){
     matk: lane(ws,    function(w){ return Math.round(30-clamp(w/60,0,1)*20); }),      // 持續風速（30→10）
     dec:  lane(hum,   function(h){ return Math.round(25+h*0.5); }),                     // 越潮濕尾巴越長（25→75）
     end:  lane(hum,   function(h){ return Math.round(clamp((h-40)/60,0,1)*50); }),
-    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(8+clamp((e+12)/72,0,1)*37); }),   // 夜 8、正午最亮 45
-    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(clamp(e,0,60)/60*18); }),
+    midx: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(8+clamp((e+12)/52,0,1)*37); }),   // 夜 8，太陽 40° 以上就到最亮 45，白天大部分時間都偏亮
+    mend: lane(sun.map(function(s){ return s.el; }), function(e){ return Math.round(clamp(e,0,40)/40*26); }),   // 調變持續量，太陽 40° 以上 26，讓亮度撐得住
     mfdk: lane(rain.map(function(r,i){ return r+(code[i]>=95?100:0); }),
                function(r){ return Math.min(99,Math.round(clamp((r%100)/10,0,1)*30)+(r>=100?15:0)); }),
     mdec: lane(cloud, function(c){ return Math.round(10+c*0.6); })
@@ -1387,13 +1589,13 @@ function mapPlace(L,W){
   const T=[
     { /* 1 太陽 */
       steps: clamp(Math.round(dl/24*16),3,16),                         // 日照越長循環越長
-      pulses: function(st){ return clamp(Math.round((sun[0].el+18)/108*st*0.5),1,st); },   // 太陽越高打點越多，最多半數
+      pulses: function(st){ return clamp(Math.round((sun[0].el+18)/108*st*0.65),1,st); },  // 太陽越高打點越多，最多 65%
       rot: function(st){ return Math.round(sun[0].az/360*st)%st; },    // 太陽方位角
       oct: Math.abs(L.lat)<23.44?4:(Math.abs(L.lat)<66.56?3:2),        // 熱帶 4、溫帶 3、寒帶 2
       pit: digits(latTxt(L.lat)),
       pan: lane(sun.map(function(s){ return Math.sin(s.az*RAD); }), panSin),   // 太陽在東偏右、在西偏左
       lvl: lane(cloud, function(c){ return Math.round(99-c*0.5); }),   // 雲越厚越小聲
-      mrat: lane(cloud, function(c){ return ratOf(c/100); })
+      mrat: lane(cloud, function(c){ return mapRat(c/100); })
     },
     { /* 2 經度與時差 */
       steps: 3+Math.round(Math.abs(L.lon)/180*13),                     // 離本初子午線越遠循環越長
@@ -1402,8 +1604,8 @@ function mapPlace(L,W){
       oct: lagA<5?3:4,
       pit: digits(lonTxt(L.lon)),
       pan: lane(hours.map(function(){ return lag; }), function(v){ return v>0?2:(v<0?0:1); }),
-      lvl: lane(hours.map(function(){ return lagA; }), function(v){ return clamp(99-v*4,40,99); }),
-      mrat: lane(hours.map(function(){ return lagA; }), function(v){ return ratOf(Math.min(v,12)/12); })
+      lvl: lane(hours.map(function(){ return lagA; }), function(v){ return clamp(95-v*2,60,95); }),   // 時差越大越小聲，差距比之前小
+      mrat: lane(hours.map(function(){ return lagA; }), function(v){ return mapRat(Math.min(v,12)/24); })   // 時差影響減半，最多到 1.5
     },
     { /* 3 當地時間 */
       steps: (hh%12)||12,                                                // 時針
@@ -1414,7 +1616,7 @@ function mapPlace(L,W){
       pan: lane(hours.map(function(i){ return Math.sin(hourOf(i)/12*2*Math.PI); }), panSin),   // 時針指向
       lvl: lane(hours.map(function(i){ return Math.cos((hourOf(i)-12)/24*2*Math.PI); }),
                 function(c){ return Math.round(60+39*(1+c)/2); }),       // 中午最響、午夜最輕
-      mrat: lane(pres, function(p){ return ratOf((1030-p)/55); })        // 氣壓越低比值越複雜
+      mrat: lane(pres, function(p){ return mapRat((1030-p)/55); })        // 氣壓越低比值越複雜
     },
     { /* 4 天氣 */
       steps: 3+Math.round(cur.relative_humidity_2m/100*13),              // 越潮濕循環越長
@@ -1424,7 +1626,7 @@ function mapPlace(L,W){
       pit: digits(Math.abs(cur.temperature_2m).toFixed(1)),
       pan: lane(ws.map(function(w,i){ return -Math.sin(wdir[i]*RAD)*w; }), function(v,i){ return drift(i); }),
       lvl: lane(rain, function(r){ return Math.min(99,55+Math.round(Math.min(r,4)*10)); }),
-      mrat: lane(rain, function(r){ return ratOf(r/5); })
+      mrat: lane(rain, function(r){ return mapRat(r/5); })
     }
   ];
 
@@ -1435,6 +1637,8 @@ function mapPlace(L,W){
     const set=function(id,vals,span){
       const Ln=t.lanes[id];
       Ln.len=vals.length; Ln.idx=0; Ln.mode=modeOf(vals,span);
+      const k=mm%vals.length;                       // 每過一分鐘，起點往後推一格，同一個地方每分鐘聽起來都有一點不同
+      vals=vals.slice(k).concat(vals.slice(0,k));
       Ln.vals=new Array(N).fill(vals[vals.length-1]);
       vals.forEach(function(v,j){ Ln.vals[j]=v; });
     };
